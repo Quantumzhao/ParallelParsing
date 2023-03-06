@@ -1,0 +1,5 @@
+class Index {}
+
+Index BuildIndexFromGzippedFASTQ(string pathToGzippedFASTQ);
+
+FASTQEntry ReadFromGzippedFASTQAndIndex(string pathToGzippedFASTQ, Index index, int position);
