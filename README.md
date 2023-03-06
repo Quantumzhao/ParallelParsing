@@ -3,3 +3,5 @@
 https://www.youtube.com/watch?v=oi2lMBBjQ8s&ab_channel=BillBird
 
 https://www.youtube.com/watch?v=KJBZyPPTwo0&ab_channel=DevPal
+
+https://en.wikipedia.org/wiki/Database_index
