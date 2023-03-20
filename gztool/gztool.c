@@ -4954,7 +4954,6 @@ int main(int argc, char **argv)
     int wait_for_file_creation = 0;
     int waiting_time = WAITING_TIME;
     //* We always want to keep the original file
-    int do_not_delete_original_file = 1;
     int extend_index_with_lines = 0;
     bool force_index_without_lines = false; // marks `-z` use
     int raw_method = 0; // for use with `-[cd]`: 0: zlib; `-[CD]`: 1: raw
@@ -4968,12 +4967,11 @@ int main(int argc, char **argv)
     enum EXIT_RETURNED_VALUES ret_value;
     enum ACTION action;
     enum VERBOSITY_LEVEL list_verbosity = VERBOSITY_NONE;
-    enum VERBOSITY_LEVEL help_verbosity = VERBOSITY_NONE;
+    //// enum VERBOSITY_LEVEL help_verbosity = VERBOSITY_NONE;
 
     int opt = 0;
     uint64_t i = 0;
     int actions_set = 0;
-
 
     action = ACT_NOT_SET;
     ret_value = EXIT_OK;
@@ -5307,8 +5305,7 @@ int main(int argc, char **argv)
         return EXIT_INVALID_OPTION;
     }
 
-    if ( do_not_delete_original_file == 1 &&
-         ( action != ACT_COMPRESS_AND_CREATE_INDEX && action != ACT_DECOMPRESS ) ) {
+    if ( action != ACT_COMPRESS_AND_CREATE_INDEX && action != ACT_DECOMPRESS ) {
         printToStderr( VERBOSITY_NORMAL, "ERROR: `-D` option invalid when not using `-[cd]`\n" );
         return EXIT_INVALID_OPTION;
     }
@@ -5539,9 +5536,9 @@ int main(int argc, char **argv)
         printToStderr( VERBOSITY_EXCESSIVE, "  -a: %d, \t-A: %d, \t-b: %llu, \t-c: %d\n",
             waiting_time, indicate_range_in_absolute_value,
             extract_from_byte, ( (action==ACT_COMPRESS_AND_CREATE_INDEX)? 1: 0 ) );
-        printToStderr( VERBOSITY_EXCESSIVE, "  -C: %d, \t-d: %d, \t-D: %d, \t-e: %d\n",
+        printToStderr( VERBOSITY_EXCESSIVE, "  -C: %d, \t-d: %d, \t-D: 1, \t-e: %d\n",
             always_create_a_complete_index, ( (action==ACT_DECOMPRESS)? 1: 0 ),
-            do_not_delete_original_file, continue_on_error );
+            continue_on_error );
         printToStderr( VERBOSITY_EXCESSIVE, "  -E: %d, \t-f: %d, \t-F: %d\n",
             end_on_first_proper_gzip_eof, force_action, force_strict_order );
         printToStderr( VERBOSITY_EXCESSIVE, "  -i: %d, \t-I: %s\n",
@@ -6149,15 +6146,15 @@ int main(int argc, char **argv)
                         lazy_gzip_stream_patching_at_eof,
                         range_number_of_bytes, range_number_of_lines,
                         compression_factor );
-                    if ( ret_value == EXIT_OK &&
-                         do_not_delete_original_file == 0 ) {
-                        printToStderr( VERBOSITY_EXCESSIVE, "Deleting file '%s'\n", file_name );
-                        // a file_name + ".gz" has been created, but now the original file must be deleted
-                        if ( remove( file_name ) != 0 ) {
-                            printToStderr( VERBOSITY_NORMAL, "ERROR: Could not delete '%s'.\n", file_name );
-                            ret_value = EXIT_GENERIC_ERROR;
-                        }
-                    }
+                    //// if ( ret_value == EXIT_OK &&
+                    ////      do_not_delete_original_file == 0 ) {
+                    ////     printToStderr( VERBOSITY_EXCESSIVE, "Deleting file '%s'\n", file_name );
+                    ////     // a file_name + ".gz" has been created, but now the original file must be deleted
+                    ////     if ( remove( file_name ) != 0 ) {
+                    ////         printToStderr( VERBOSITY_NORMAL, "ERROR: Could not delete '%s'.\n", file_name );
+                    ////         ret_value = EXIT_GENERIC_ERROR;
+                    ////     }
+                    //// }
                     break;
 
                 case ACT_DECOMPRESS:
@@ -6182,15 +6179,15 @@ int main(int argc, char **argv)
                             char *output_filename = malloc( strlen(file_name) );
                             sprintf(output_filename, "%s", file_name);
                             output_filename[strlen(file_name) - 3] = '\0';
-                            if ( do_not_delete_original_file == 0 ) {
-                                printToStderr( VERBOSITY_EXCESSIVE, "Deleting file '%s'\n", file_name );
-                                // delete the original file
-                                if ( remove( file_name ) != 0 ) {
-                                    printToStderr( VERBOSITY_NORMAL,
-                                        "WARNING: Decompression finished, but could not delete '%s'.\n", file_name );
-                                    ret_value = EXIT_GENERIC_ERROR;
-                                }
-                            }
+                            //// if ( do_not_delete_original_file == 0 ) {
+                            ////     printToStderr( VERBOSITY_EXCESSIVE, "Deleting file '%s'\n", file_name );
+                            ////     // delete the original file
+                            ////     if ( remove( file_name ) != 0 ) {
+                            ////         printToStderr( VERBOSITY_NORMAL,
+                            ////             "WARNING: Decompression finished, but could not delete '%s'.\n", file_name );
+                            ////         ret_value = EXIT_GENERIC_ERROR;
+                            ////     }
+                            //// }
                             free( output_filename );
                         }
                     } else {
