@@ -4829,106 +4829,102 @@ uint64_t giveMeAnInteger( const char *original_input ) {
 // .................................................
 
 
-// print brief help
-local void print_brief_help() {
-
-    fprintf( stderr, "\n" );
-    fprintf( stderr, "  %s (v%s)\n", PACKAGE_NAME, PACKAGE_VERSION );
-    fprintf( stderr, "  GZIP files indexer, compressor and data retriever.\n" );
-    fprintf( stderr, "  Create small indexes for gzipped files and use them\n" );
-    fprintf( stderr, "  for quick and random-positioned data extraction.\n" );
-    fprintf( stderr, "  //github.com/circulosmeos/gztool (by Roberto S. Galende)\n\n" );
-    fprintf( stderr, "  $ gztool [-[abLnsv] #] [-[1..9]AcCdDeEfFhilpPrRStTwWxXz|u[cCdD]] [-I <INDEX>] <FILE>...\n\n" );
-    fprintf( stderr, "  `gztool -hh` for more help\n" );
-    fprintf( stderr, "\n" );
-
-}
+//// // print brief help
+//// local void print_brief_help() {
+////     fprintf( stderr, "\n" );
+////     fprintf( stderr, "  %s (v%s)\n", PACKAGE_NAME, PACKAGE_VERSION );
+////     fprintf( stderr, "  GZIP files indexer, compressor and data retriever.\n" );
+////     fprintf( stderr, "  Create small indexes for gzipped files and use them\n" );
+////     fprintf( stderr, "  for quick and random-positioned data extraction.\n" );
+////     fprintf( stderr, "  //github.com/circulosmeos/gztool (by Roberto S. Galende)\n\n" );
+////     fprintf( stderr, "  $ gztool [-[abLnsv] #] [-[1..9]AcCdDeEfFhilpPrRStTwWxXz|u[cCdD]] [-I <INDEX>] <FILE>...\n\n" );
+////     fprintf( stderr, "  `gztool -hh` for more help\n" );
+////     fprintf( stderr, "\n" );
+//// }
 
 
-// print help
-local void print_help() {
-
-    fprintf( stderr, "\n" );
-    fprintf( stderr, "  %s (v%s)\n", PACKAGE_NAME, PACKAGE_VERSION );
-    fprintf( stderr, "  GZIP files indexer, compressor and data retriever.\n" );
-    fprintf( stderr, "  Create small indexes for gzipped files and use them\n" );
-    fprintf( stderr, "  for quick and random-positioned data extraction.\n" );
-    fprintf( stderr, "  No more waiting when the end of a 10 GiB gzip is needed!\n" );
-    fprintf( stderr, "  //github.com/circulosmeos/gztool (by Roberto S. Galende)\n\n" );
-    fprintf( stderr, "  $ gztool [-[abLnsv] #] [-[1..9]AcCdDeEfFhilpPrRStTwWxXz|u[cCdD]] [-I <INDEX>] <FILE>...\n\n" );
-    fprintf( stderr, "  Note that actions `-bcStT` proceed to an index file creation (if\n" );
-    fprintf( stderr, "  none exists) INTERLEAVED with data flow. As data flow and\n" );
-    fprintf( stderr, "  index creation occur at the same time there's no waste of time.\n" );
-    fprintf( stderr, "  Also you can interrupt actions at any moment and the remaining\n" );
-    fprintf( stderr, "  index file will be reused (and completed if necessary) on the\n" );
-    fprintf( stderr, "  next gztool run over the same data.\n\n" );
-    fprintf( stderr, " -[1..9]: compression factor to use with `-[c|u[cC]]`, from\n" );
-    fprintf( stderr, "     best speed (`-1`) to best compression (`-9`). Default is `-6`.\n" );
-    fprintf( stderr, " -a #: Await # seconds between reads when `-[ST]|Ec`. Default is 4 s.\n" );
-    fprintf( stderr, " -A: Modifier for `-[rR]` to indicate the range of bytes/lines in\n" );
-    fprintf( stderr, "     absolute values, instead of the default incremental values.\n" );
-    fprintf( stderr, " -b #: extract data from indicated uncompressed byte position of\n" );
-    fprintf( stderr, "     gzip file (creating or reusing an index file) to STDOUT.\n" );
-    fprintf( stderr, "     Accepts '0', '0x', and suffixes 'kmgtpe' (^10) 'KMGTPE' (^2).\n" );
-    fprintf( stderr, " -C: always create a 'Complete' index file, ignoring possible errors.\n" );
-    fprintf( stderr, " -c: compress a file like with gzip, creating an index at the same time.\n" );
-    fprintf( stderr, " -d: decompress a file like with gzip.\n" );
-    fprintf( stderr, " -D: do not delete original file when using `-[cd]`.\n" );
-    fprintf( stderr, " -e: if multiple files are indicated, continue on error (if any).\n" );
-    fprintf( stderr, " -E: end processing on first GZIP end of file marker at EOF.\n" );
-    fprintf( stderr, "     Nonetheless with `-c`, `-E` waits for more data even at EOF.\n" );
-    fprintf( stderr, " -f: force file overwriting if index file already exists.\n" );
-    fprintf( stderr, " -F: force index creation/completion first, and then action: if\n" );
-    fprintf( stderr, "     `-F` is not used, index is created interleaved with actions.\n" );
-    fprintf( stderr, " -h: print brief help; `-hh` prints this help.\n" );
-    fprintf( stderr, " -i: create index for indicated gzip file (For 'file.gz' the default\n" );
-    fprintf( stderr, "     index file name will be 'file.gzi'). This is the default action.\n" );
-    fprintf( stderr, " -I string: index file name will be the indicated string.\n" );
-    fprintf( stderr, " -l: check and list info contained in indicated index file.\n" );
-    fprintf( stderr, "     `-ll` and `-lll` increase the level of index checking detail.\n" );
-    fprintf( stderr, " -L #: extract data from indicated uncompressed line position of\n" );
-    fprintf( stderr, "     gzip file (creating or reusing an index file) to STDOUT.\n" );
-    fprintf( stderr, "     Accepts '0', '0x', and suffixes 'kmgtpe' (^10) 'KMGTPE' (^2).\n" );
-    fprintf( stderr, " -n #: indicates that the first byte on compressed input is #, not 1,\n" );
-    fprintf( stderr, "     and so truncated compressed inputs can be used if an index exists.\n" );
-    fprintf( stderr, " -p: indicates that the gzip input stream may be composed of various\n" );
-    fprintf( stderr, "     incorrectly terminated GZIP streams, and so then a careful\n" );
-    fprintf( stderr, "     Patching of the input may be needed to extract correct data.\n" );
-    fprintf( stderr, " -P: like `-p`, but when used with `-[ST]` implies that checking\n" );
-    fprintf( stderr, "     for errors in stream is made as quick as possible as the gzip file\n" );
-    fprintf( stderr, "     grows. Warning: this may lead to some errors not being patched.\n" );
-    fprintf( stderr, " -r #: (range): Number of bytes to extract when using `-[bL]`.\n" );
-    fprintf( stderr, "     Accepts '0', '0x', and suffixes 'kmgtpe' (^10) 'KMGTPE' (^2).\n" );
-    fprintf( stderr, " -R #: (Range): Number of lines to extract when using `-[bL]`.\n" );
-    fprintf( stderr, "     Accepts '0', '0x', and suffixes 'kmgtpe' (^10) 'KMGTPE' (^2).\n" );
-    fprintf( stderr, " -s #: span in uncompressed MiB between index points when\n" );
-    fprintf( stderr, "     creating the index. By default is `10`.\n" );
-    fprintf( stderr, " -S: Supervise indicated file: create a growing index,\n" );
-    fprintf( stderr, "     for a still-growing gzip file. (`-i` is implicit).\n" );
-    fprintf( stderr, " -t: tail (extract last bytes) to STDOUT on indicated gzip file.\n" );
-    fprintf( stderr, " -T: tail (extract last bytes) to STDOUT on indicated still-growing\n" );
-    fprintf( stderr, "     gzip file, and continue Supervising & extracting to STDOUT.\n" );
-    fprintf( stderr, " -u [cCdD]: utility to compress (`-u c`) or decompress (`-u d`)\n" );
-    fprintf( stderr, "          zlib-format files to STDOUT. Use `-u C` and `-u D`\n" );
-    fprintf( stderr, "          to manage raw compressed files. No index involved.\n" );
-    fprintf( stderr, " -v #: output verbosity: from `0` (none) to `5` (nuts).\n" );
-    fprintf( stderr, "     Default is `1` (normal).\n" );
-    fprintf( stderr, " -w: wait for creation if file doesn't exist, when using `-[cdST]`.\n" );
-    fprintf( stderr, " -W: do not Write index to disk. But if one is already available\n" );
-    fprintf( stderr, "     read and use it. Useful if the index is still under an `-S` run.\n" );
-    fprintf( stderr, " -x: create index with line number information (win/*nix compatible).\n" );
-    fprintf( stderr, "     (Index counts last line even w/o newline char (`wc` does not!)).\n" );
-    fprintf( stderr, "     This is implicit unless `-X` or `-z` are indicated.\n" );
-    fprintf( stderr, " -X: like `-x`, but newline character is '\\r' (old mac).\n" );
-    fprintf( stderr, " -z: create index without line number information.\n" );
-    fprintf( stderr, "\n" );
-    fprintf( stderr, "  EXAMPLE: Extract data from 1 GiB byte (byte 2^30) on,\n" );
-    fprintf( stderr, "  from `myfile.gz` to the file `myfile.txt`. Also gztool will\n" );
-    fprintf( stderr, "  create (or reuse, or complete) an index file named `myfile.gzi`:\n" );
-    fprintf( stderr, "  $ gztool -b 1G myfile.gz > myfile.txt\n" );
-    fprintf( stderr, "\n" );
-
-}
+//// print help
+//// local void print_help() {
+////     fprintf( stderr, "\n" );
+////     fprintf( stderr, "  %s (v%s)\n", PACKAGE_NAME, PACKAGE_VERSION );
+////     fprintf( stderr, "  GZIP files indexer, compressor and data retriever.\n" );
+////     fprintf( stderr, "  Create small indexes for gzipped files and use them\n" );
+////     fprintf( stderr, "  for quick and random-positioned data extraction.\n" );
+////     fprintf( stderr, "  No more waiting when the end of a 10 GiB gzip is needed!\n" );
+////     fprintf( stderr, "  //github.com/circulosmeos/gztool (by Roberto S. Galende)\n\n" );
+////     fprintf( stderr, "  $ gztool [-[abLnsv] #] [-[1..9]AcCdDeEfFhilpPrRStTwWxXz|u[cCdD]] [-I <INDEX>] <FILE>...\n\n" );
+////     fprintf( stderr, "  Note that actions `-bcStT` proceed to an index file creation (if\n" );
+////     fprintf( stderr, "  none exists) INTERLEAVED with data flow. As data flow and\n" );
+////     fprintf( stderr, "  index creation occur at the same time there's no waste of time.\n" );
+////     fprintf( stderr, "  Also you can interrupt actions at any moment and the remaining\n" );
+////     fprintf( stderr, "  index file will be reused (and completed if necessary) on the\n" );
+////     fprintf( stderr, "  next gztool run over the same data.\n\n" );
+////     fprintf( stderr, " -[1..9]: compression factor to use with `-[c|u[cC]]`, from\n" );
+////     fprintf( stderr, "     best speed (`-1`) to best compression (`-9`). Default is `-6`.\n" );
+////     fprintf( stderr, " -a #: Await # seconds between reads when `-[ST]|Ec`. Default is 4 s.\n" );
+////     fprintf( stderr, " -A: Modifier for `-[rR]` to indicate the range of bytes/lines in\n" );
+////     fprintf( stderr, "     absolute values, instead of the default incremental values.\n" );
+////     fprintf( stderr, " -b #: extract data from indicated uncompressed byte position of\n" );
+////     fprintf( stderr, "     gzip file (creating or reusing an index file) to STDOUT.\n" );
+////     fprintf( stderr, "     Accepts '0', '0x', and suffixes 'kmgtpe' (^10) 'KMGTPE' (^2).\n" );
+////     fprintf( stderr, " -C: always create a 'Complete' index file, ignoring possible errors.\n" );
+////     fprintf( stderr, " -c: compress a file like with gzip, creating an index at the same time.\n" );
+////     fprintf( stderr, " -d: decompress a file like with gzip.\n" );
+////     fprintf( stderr, " -D: do not delete original file when using `-[cd]`.\n" );
+////     fprintf( stderr, " -e: if multiple files are indicated, continue on error (if any).\n" );
+////     fprintf( stderr, " -E: end processing on first GZIP end of file marker at EOF.\n" );
+////     fprintf( stderr, "     Nonetheless with `-c`, `-E` waits for more data even at EOF.\n" );
+////     fprintf( stderr, " -f: force file overwriting if index file already exists.\n" );
+////     fprintf( stderr, " -F: force index creation/completion first, and then action: if\n" );
+////     fprintf( stderr, "     `-F` is not used, index is created interleaved with actions.\n" );
+////     fprintf( stderr, " -h: print brief help; `-hh` prints this help.\n" );
+////     fprintf( stderr, " -i: create index for indicated gzip file (For 'file.gz' the default\n" );
+////     fprintf( stderr, "     index file name will be 'file.gzi'). This is the default action.\n" );
+////     fprintf( stderr, " -I string: index file name will be the indicated string.\n" );
+////     fprintf( stderr, " -l: check and list info contained in indicated index file.\n" );
+////     fprintf( stderr, "     `-ll` and `-lll` increase the level of index checking detail.\n" );
+////     fprintf( stderr, " -L #: extract data from indicated uncompressed line position of\n" );
+////     fprintf( stderr, "     gzip file (creating or reusing an index file) to STDOUT.\n" );
+////     fprintf( stderr, "     Accepts '0', '0x', and suffixes 'kmgtpe' (^10) 'KMGTPE' (^2).\n" );
+////     fprintf( stderr, " -n #: indicates that the first byte on compressed input is #, not 1,\n" );
+////     fprintf( stderr, "     and so truncated compressed inputs can be used if an index exists.\n" );
+////     fprintf( stderr, " -p: indicates that the gzip input stream may be composed of various\n" );
+////     fprintf( stderr, "     incorrectly terminated GZIP streams, and so then a careful\n" );
+////     fprintf( stderr, "     Patching of the input may be needed to extract correct data.\n" );
+////     fprintf( stderr, " -P: like `-p`, but when used with `-[ST]` implies that checking\n" );
+////     fprintf( stderr, "     for errors in stream is made as quick as possible as the gzip file\n" );
+////     fprintf( stderr, "     grows. Warning: this may lead to some errors not being patched.\n" );
+////     fprintf( stderr, " -r #: (range): Number of bytes to extract when using `-[bL]`.\n" );
+////     fprintf( stderr, "     Accepts '0', '0x', and suffixes 'kmgtpe' (^10) 'KMGTPE' (^2).\n" );
+////     fprintf( stderr, " -R #: (Range): Number of lines to extract when using `-[bL]`.\n" );
+////     fprintf( stderr, "     Accepts '0', '0x', and suffixes 'kmgtpe' (^10) 'KMGTPE' (^2).\n" );
+////     fprintf( stderr, " -s #: span in uncompressed MiB between index points when\n" );
+////     fprintf( stderr, "     creating the index. By default is `10`.\n" );
+////     fprintf( stderr, " -S: Supervise indicated file: create a growing index,\n" );
+////     fprintf( stderr, "     for a still-growing gzip file. (`-i` is implicit).\n" );
+////     fprintf( stderr, " -t: tail (extract last bytes) to STDOUT on indicated gzip file.\n" );
+////     fprintf( stderr, " -T: tail (extract last bytes) to STDOUT on indicated still-growing\n" );
+////     fprintf( stderr, "     gzip file, and continue Supervising & extracting to STDOUT.\n" );
+////     fprintf( stderr, " -u [cCdD]: utility to compress (`-u c`) or decompress (`-u d`)\n" );
+////     fprintf( stderr, "          zlib-format files to STDOUT. Use `-u C` and `-u D`\n" );
+////     fprintf( stderr, "          to manage raw compressed files. No index involved.\n" );
+////     fprintf( stderr, " -v #: output verbosity: from `0` (none) to `5` (nuts).\n" );
+////     fprintf( stderr, "     Default is `1` (normal).\n" );
+////     fprintf( stderr, " -w: wait for creation if file doesn't exist, when using `-[cdST]`.\n" );
+////     fprintf( stderr, " -W: do not Write index to disk. But if one is already available\n" );
+////     fprintf( stderr, "     read and use it. Useful if the index is still under an `-S` run.\n" );
+////     fprintf( stderr, " -x: create index with line number information (win/*nix compatible).\n" );
+////     fprintf( stderr, "     (Index counts last line even w/o newline char (`wc` does not!)).\n" );
+////     fprintf( stderr, "     This is implicit unless `-X` or `-z` are indicated.\n" );
+////     fprintf( stderr, " -X: like `-x`, but newline character is '\\r' (old mac).\n" );
+////     fprintf( stderr, " -z: create index without line number information.\n" );
+////     fprintf( stderr, "\n" );
+////     fprintf( stderr, "  EXAMPLE: Extract data from 1 GiB byte (byte 2^30) on,\n" );
+////     fprintf( stderr, "  from `myfile.gz` to the file `myfile.txt`. Also gztool will\n" );
+////     fprintf( stderr, "  create (or reuse, or complete) an index file named `myfile.gzi`:\n" );
+////     fprintf( stderr, "  $ gztool -b 1G myfile.gz > myfile.txt\n" );
+////     fprintf( stderr, "\n" );
+//// }
 
 
 // OUTPUT:
@@ -4957,7 +4953,8 @@ int main(int argc, char **argv)
     int always_create_a_complete_index = 0;
     int wait_for_file_creation = 0;
     int waiting_time = WAITING_TIME;
-    int do_not_delete_original_file = 0;
+    //* We always want to keep the original file
+    int do_not_delete_original_file = 1;
     int extend_index_with_lines = 0;
     bool force_index_without_lines = false; // marks `-z` use
     int raw_method = 0; // for use with `-[cd]`: 0: zlib; `-[CD]`: 1: raw
@@ -4982,12 +4979,12 @@ int main(int argc, char **argv)
     ret_value = EXIT_OK;
     while ((opt = getopt(argc, argv, "123456789a:Ab:cCdDeEfFhiI:lL:n:pPr:R:s:StTu:v:wWxXz")) != -1)
         switch (opt) {
-            // help
-            case 'h':
-                help_verbosity++;
-                if ( help_verbosity > VERBOSITY_EXCESSIVE )
-                    help_verbosity = VERBOSITY_EXCESSIVE;
-                break;
+            //// help
+            //// case 'h':
+            ////     help_verbosity++;
+            ////     if ( help_verbosity > VERBOSITY_EXCESSIVE )
+            ////         help_verbosity = VERBOSITY_EXCESSIVE;
+            ////     break;
             // compression factor options: [1-9]
             case '1':
             case '2':
@@ -5034,10 +5031,10 @@ int main(int argc, char **argv)
                 action = ACT_DECOMPRESS;
                 actions_set++;
                 break;
-            // `-D` no not delete original file with `-[cd]`
-            case 'D':
-                do_not_delete_original_file = 1;
-                break;
+            //// // `-D` no not delete original file with `-[cd]`
+            //// case 'D':
+            ////     do_not_delete_original_file = 1;
+            ////     break;
             // `-e` continues on error if multiple input files indicated
             case 'e':
                 continue_on_error = 1;
@@ -5192,17 +5189,18 @@ int main(int argc, char **argv)
                     return EXIT_INVALID_OPTION;
                 }
                 break;
-            // `-v` verbosity
-            case 'v':
-                verbosity_level = (int)strtol( optarg, NULL, 10 );
-                if ( ( optarg[0] != '0' && verbosity_level == 0 ) ||
-                     strlen( optarg ) > 1 ||
-                     verbosity_level > VERBOSITY_NUTS ) {
-                    verbosity_level = VERBOSITY_NORMAL; // without this an erroneous `-v` may not be shown
-                    printToStderr( VERBOSITY_NORMAL, "ERROR: Invalid option `-v %s` (`-v [0..5]`).\n", optarg );
-                    return EXIT_INVALID_OPTION;
-                }
-                break;
+            //* We don't need detailed log
+            //// // `-v` verbosity
+            //// case 'v':
+            ////     verbosity_level = (int)strtol( optarg, NULL, 10 );
+            ////     if ( ( optarg[0] != '0' && verbosity_level == 0 ) ||
+            ////          strlen( optarg ) > 1 ||
+            ////          verbosity_level > VERBOSITY_NUTS ) {
+            ////         verbosity_level = VERBOSITY_NORMAL; // without this an erroneous `-v` may not be shown
+            ////         printToStderr( VERBOSITY_NORMAL, "ERROR: Invalid option `-v %s` (`-v [0..5]`).\n", optarg );
+            ////         return EXIT_INVALID_OPTION;
+            ////     }
+            ////     break;
             // `-w` wait for file creation with `-[STcd]`
             case 'w':
                 wait_for_file_creation = 1;
@@ -5225,30 +5223,30 @@ int main(int argc, char **argv)
             case 'z':
                 force_index_without_lines = true;
                 break;
-            case '?':
-                if ( isprint (optopt) ) {
-                    // print warning only if char option is unknown
-                    if ( NULL == strchr("123456789aAbcCdDeEfFhiIlLnpPrRSstTuvwWxXz", optopt) ) {
-                        printToStderr( VERBOSITY_NORMAL, "ERROR: Unknown option `-%c'.\n", optopt);
-                        print_help();
-                    }
-                } else
-                    printToStderr( VERBOSITY_NORMAL, "ERROR: Unknown option character `\\x%x'.\n", optopt);
-                printToStderr( VERBOSITY_NORMAL, "\n" );
-                return EXIT_INVALID_OPTION;
+            //// case '?':
+            ////     if ( isprint (optopt) ) {
+            ////         // print warning only if char option is unknown
+            ////         if ( NULL == strchr("123456789aAbcCdDeEfFhiIlLnpPrRSstTuvwWxXz", optopt) ) {
+            ////             printToStderr( VERBOSITY_NORMAL, "ERROR: Unknown option `-%c'.\n", optopt);
+            ////             print_help();
+            ////         }
+            ////     } else
+            ////         printToStderr( VERBOSITY_NORMAL, "ERROR: Unknown option character `\\x%x'.\n", optopt);
+            ////     printToStderr( VERBOSITY_NORMAL, "\n" );
+            ////     return EXIT_INVALID_OPTION;
             default:
                 printToStderr( VERBOSITY_NORMAL, "\n" );
                 abort ();
         }
 
-    // check for help action and exit
-    if ( help_verbosity > VERBOSITY_NONE ) {
-        if ( help_verbosity == VERBOSITY_NORMAL )
-            print_brief_help();
-        else
-            print_help();
-        return EXIT_OK;
-    }
+    //// // check for help action and exit
+    //// if ( help_verbosity > VERBOSITY_NONE ) {
+    ////     if ( help_verbosity == VERBOSITY_NORMAL )
+    ////         print_brief_help();
+    ////     else
+    ////         print_help();
+    ////     return EXIT_OK;
+    //// }
 
 
     /*
