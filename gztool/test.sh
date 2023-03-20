@@ -1,4 +1,8 @@
 #!/bin/bash
+if [ `bash ./compile.sh` ]; then
+	exit 1;
+fi
+
 OUTPUT_FILE=./tests/gplv3.txt.gzi
 
 CKSUM0=`md5sum "./tests/gplv3.txt.gzi.ORIG" | awk '{print $1;}'`
@@ -11,8 +15,10 @@ echo gplv3.txt.gzi CHECKSUM = $CKSUM1
 
 if [ "$CKSUM0" = "$CKSUM1" ]; then
 	rm "${OUTPUT_FILE}"
+	echo "PASS"
 	exit 0;
 else
 	echo $CKSUM0 != $CKSUM1;
+	echo "FAIL"
 	exit 1;
 fi
