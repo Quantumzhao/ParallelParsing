@@ -248,7 +248,6 @@ enum ACTION
     ACT_SUPERVISE,
     ACT_EXTRACT_TAIL,
     ACT_EXTRACT_TAIL_AND_CONTINUE,
-    ACT_COMPRESS_AND_CREATE_INDEX,
     ACT_DECOMPRESS,
     ACT_EXTRACT_FROM_LINE
 };
@@ -4904,7 +4903,6 @@ int main(int argc, char **argv)
     int compression_factor = 0;
     bool lazy_gzip_stream_patching_at_eof = false;
     bool indicate_range_in_absolute_value = false;
-    char utility_option = ' ';
     uint64_t count_errors = 0;
 
     enum EXIT_RETURNED_VALUES ret_value;
@@ -4919,18 +4917,6 @@ int main(int argc, char **argv)
     while ((opt = getopt(argc, argv, "123456789a:Ab:cCdDeEfFhiI:lL:n:pPr:R:s:StTu:v:wWxXz")) != -1)
         switch (opt)
         {
-        // compression factor options: [1-9]
-        case '1':
-        case '2':
-        case '3':
-        case '4':
-        case '5':
-        case '6':
-        case '7':
-        case '8':
-        case '9':
-            compression_factor = (char)opt - '0';
-            break;
         // `-a #` default waiting time in seconds when supervising a growing gzip file (`-[ST]`)
         case 'a':
             waiting_time = (int)strtol(optarg, NULL, 10);
@@ -4952,11 +4938,11 @@ int main(int argc, char **argv)
             action = ACT_EXTRACT_FROM_BYTE;
             actions_set++;
             break;
-        // `-c` compress <FILE> (or stdin if none) to FILE.gz and create index for it
-        case 'c':
-            action = ACT_COMPRESS_AND_CREATE_INDEX;
-            actions_set++;
-            break;
+        //// `-c` compress <FILE> (or stdin if none) to FILE.gz and create index for it
+        //// case 'c':
+        ////     action = ACT_COMPRESS_AND_CREATE_INDEX;
+        ////     actions_set++;
+        ////     break;
         // `-C` generates always a complete index file, ignoring possible decompression errors
         case 'C':
             always_create_a_complete_index = 1;
@@ -5081,46 +5067,6 @@ int main(int argc, char **argv)
             action = ACT_EXTRACT_TAIL_AND_CONTINUE;
             actions_set++;
             break;
-        // `-u [cd]`: utility to compress (`-u c`) or decompress (`-u d`) zlib-format files
-        case 'u':
-            // span is converted to from MiB to bytes for internal use
-            if (strlen(optarg) == 1)
-            {
-                switch (optarg[0])
-                {
-                case 'c':
-                    action = ACT_COMPRESS_CHUNK;
-                    actions_set++;
-                    utility_option = optarg[0];
-                    break;
-                case 'd':
-                    action = ACT_DECOMPRESS_CHUNK;
-                    actions_set++;
-                    utility_option = optarg[0];
-                    break;
-                case 'C':
-                    action = ACT_COMPRESS_CHUNK;
-                    raw_method = 1;
-                    actions_set++;
-                    utility_option = optarg[0];
-                    break;
-                case 'D':
-                    action = ACT_DECOMPRESS_CHUNK;
-                    raw_method = 1;
-                    actions_set++;
-                    utility_option = optarg[0];
-                    break;
-                default:
-                    printToStderr("ERROR: Invalid option `-u %s` (`-u [cCdD]`).\n", optarg);
-                    return EXIT_INVALID_OPTION;
-                }
-            }
-            else
-            {
-                printToStderr("ERROR: Invalid option `-u %s` (`-u [cCdD]`).\n", optarg);
-                return EXIT_INVALID_OPTION;
-            }
-            break;
         // `-w` wait for file creation with `-[STcd]`
         case 'w':
             wait_for_file_creation = 1;
@@ -5148,24 +5094,6 @@ int main(int argc, char **argv)
             abort();
         }
 
-    /*
-     * Checking parameter merging and absence:
-     */
-
-    if (compression_factor > 0)
-    {
-        if (action != ACT_COMPRESS_AND_CREATE_INDEX &&
-            action != ACT_COMPRESS_CHUNK)
-        {
-            printToStderr("ERROR: compression factor (`-[1..9]`) must be used with `-[c|u[cC]]`.\n");
-            return EXIT_INVALID_OPTION;
-        }
-    }
-    else
-    {
-        compression_factor = Z_DEFAULT_COMPRESSION; // (btw, it's -1, which means 6 for zlib)
-    }
-
     if (actions_set > 1)
     {
         printToStderr("ERROR: do not merge parameters `-[bcdilLStTu]`.\n");
@@ -5180,7 +5108,7 @@ int main(int argc, char **argv)
     }
 
     if ((action != ACT_SUPERVISE && action != ACT_EXTRACT_TAIL_AND_CONTINUE &&
-         action != ACT_COMPRESS_AND_CREATE_INDEX && action != ACT_DECOMPRESS) &&
+         action != ACT_DECOMPRESS) &&
         wait_for_file_creation == 1)
     {
         printToStderr("ERROR: `-w` only apply to `-[cdST]`\n");
@@ -5203,8 +5131,7 @@ int main(int argc, char **argv)
         return EXIT_INVALID_OPTION;
     }
 
-    if (do_not_delete_original_file == 1 &&
-        (action != ACT_COMPRESS_AND_CREATE_INDEX && action != ACT_DECOMPRESS))
+    if (do_not_delete_original_file == 1 && action != ACT_DECOMPRESS)
     {
         printToStderr("ERROR: `-D` option invalid when not using `-[cd]`\n");
         return EXIT_INVALID_OPTION;
@@ -5256,7 +5183,6 @@ int main(int argc, char **argv)
         action == ACT_SUPERVISE ||
         action == ACT_EXTRACT_TAIL ||
         action == ACT_EXTRACT_TAIL_AND_CONTINUE ||
-        action == ACT_COMPRESS_AND_CREATE_INDEX ||
         action == ACT_EXTRACT_FROM_LINE ||
         action == ACT_DECOMPRESS
         // it's stated that "DECOMPRESS does not require index" @ action_create_index() BUT
@@ -5370,12 +5296,6 @@ int main(int argc, char **argv)
         return EXIT_INVALID_OPTION;
     }
 
-    if (1 == force_strict_order && action == ACT_COMPRESS_AND_CREATE_INDEX)
-    {
-        printToStderr("ERROR: `-F` not implemented with `-c`.\n");
-        return EXIT_INVALID_OPTION;
-    }
-
     if (true == lazy_gzip_stream_patching_at_eof &&
         (action != ACT_SUPERVISE &&
          action != ACT_EXTRACT_TAIL_AND_CONTINUE))
@@ -5431,9 +5351,6 @@ int main(int argc, char **argv)
         case ACT_EXTRACT_TAIL_AND_CONTINUE:
             action_string = "Extract from tail data from a still-growing file";
             break;
-        case ACT_COMPRESS_AND_CREATE_INDEX:
-            action_string = "Compress file and create index";
-            break;
         case ACT_DECOMPRESS:
             action_string = "Decompress file";
             break;
@@ -5466,15 +5383,6 @@ int main(int argc, char **argv)
     {
         // file input is stdin
 
-        // ACT_COMPRESS_AND_CREATE_INDEX requires an index file name:
-        if (action == ACT_COMPRESS_AND_CREATE_INDEX &&
-            0 == index_filename_indicated)
-        {
-            // if no index filename is set (`-I`), compression cannot proceed
-            printToStderr("ERROR: Index filename must be provided with `-I` when compressing STDIN.\n");
-            return EXIT_GENERIC_ERROR;
-        }
-
         // `-p` cannot operate with STDIN input
         if (gzip_stream_may_be_damaged > 0)
         {
@@ -5486,8 +5394,7 @@ int main(int argc, char **argv)
         if ((action == ACT_CREATE_INDEX || action == ACT_SUPERVISE ||
              action == ACT_EXTRACT_TAIL_AND_CONTINUE ||
              action == ACT_EXTRACT_FROM_BYTE || action == ACT_EXTRACT_FROM_LINE ||
-             action == ACT_EXTRACT_TAIL ||
-             action == ACT_COMPRESS_AND_CREATE_INDEX) &&
+             action == ACT_EXTRACT_TAIL) &&
             1 == index_filename_indicated &&
             access(index_filename, F_OK) != -1)
         {
@@ -5499,22 +5406,14 @@ int main(int argc, char **argv)
 
             if (force_action == 0)
             {
-                if (action == ACT_COMPRESS_AND_CREATE_INDEX)
+                printToStderr("Index file '%s' already exists and will be used.\n", index_filename);
+                if (write_index_to_disk == 0)
                 {
-                    printToStderr("ERROR: Index file '%s' already exists.\n\n", index_filename);
-                    return EXIT_GENERIC_ERROR;
+                    printToStderr("Index file will NOT be modified.\n");
                 }
                 else
                 {
-                    printToStderr("Index file '%s' already exists and will be used.\n", index_filename);
-                    if (write_index_to_disk == 0)
-                    {
-                        printToStderr("Index file will NOT be modified.\n");
-                    }
-                    else
-                    {
-                        ; // printToStderr("(Use `-f` to force overwriting.)\n" );
-                    }
+                    ; // printToStderr("(Use `-f` to force overwriting.)\n" );
                 }
             }
             else
@@ -5738,20 +5637,6 @@ int main(int argc, char **argv)
             printToStderr("\n");
             break;
 
-        case ACT_COMPRESS_AND_CREATE_INDEX:
-            // if code reaches here, and index_filename exists
-            // TODO: implement `-F` for COMPRESS_AND_CREATE_INDEX ?
-            ret_value = action_create_index("", &index, index_filename,
-                                            COMPRESS_AND_CREATE_INDEX, 0, 0, span_between_points,
-                                            write_index_to_disk, end_on_first_proper_gzip_eof,
-                                            always_create_a_complete_index, waiting_time, force_action,
-                                            wait_for_file_creation, extend_index_with_lines,
-                                            expected_first_byte, gzip_stream_may_be_damaged,
-                                            lazy_gzip_stream_patching_at_eof,
-                                            range_number_of_bytes, range_number_of_lines,
-                                            compression_factor);
-            break;
-
         default:
             printToStderr("ERROR: action not specified.\n");
             ret_value = EXIT_GENERIC_ERROR;
@@ -5788,21 +5673,14 @@ int main(int argc, char **argv)
                 index_filename = malloc(strlen(argv[i]) + 4 + 1);
                 sprintf(index_filename, "%s", argv[i]);
 
-                if (action == ACT_COMPRESS_AND_CREATE_INDEX)
-                {
-                    sprintf(index_filename, "%s.gzi", argv[i]);
-                }
+                if (strlen(argv[i]) > 3 && // avoid out-of-bounds
+                    (char *)strstr(index_filename, ".gz") ==
+                        (char *)(index_filename + strlen(argv[i]) - 3))
+                    // if gzip-file name is 'FILE.gz', index file name will be 'FILE.gzi'
+                    sprintf(index_filename, "%si", argv[i]);
                 else
-                {
-                    if (strlen(argv[i]) > 3 && // avoid out-of-bounds
-                        (char *)strstr(index_filename, ".gz") ==
-                            (char *)(index_filename + strlen(argv[i]) - 3))
-                        // if gzip-file name is 'FILE.gz', index file name will be 'FILE.gzi'
-                        sprintf(index_filename, "%si", argv[i]);
-                    else
-                        // otherwise, the complete extension '.gzi' is appended
-                        sprintf(index_filename, "%s.gzi", argv[i]);
-                }
+                    // otherwise, the complete extension '.gzi' is appended
+                    sprintf(index_filename, "%s.gzi", argv[i]);
             }
 
             // free previous loop's resources
@@ -5820,8 +5698,7 @@ int main(int argc, char **argv)
             if ((action == ACT_CREATE_INDEX || action == ACT_SUPERVISE ||
                  action == ACT_EXTRACT_TAIL_AND_CONTINUE ||
                  action == ACT_EXTRACT_FROM_BYTE || action == ACT_EXTRACT_FROM_LINE ||
-                 action == ACT_EXTRACT_TAIL ||
-                 action == ACT_COMPRESS_AND_CREATE_INDEX) &&
+                 action == ACT_EXTRACT_TAIL) &&
                 access(index_filename, F_OK) != -1)
             {
                 // index file already exists
@@ -6044,29 +5921,6 @@ int main(int argc, char **argv)
                 // this has the side efect that `-[fW]T` may get stuck here forever
                 // unless end_on_first_proper_gzip_eof == 1
                 printToStderr("\n");
-                break;
-
-            case ACT_COMPRESS_AND_CREATE_INDEX:
-                // if code reaches here, and index_filename exists
-                ret_value = action_create_index(file_name, &index, index_filename,
-                                                COMPRESS_AND_CREATE_INDEX, 0, 0, span_between_points,
-                                                write_index_to_disk, end_on_first_proper_gzip_eof,
-                                                always_create_a_complete_index, waiting_time, force_action,
-                                                wait_for_file_creation, extend_index_with_lines,
-                                                expected_first_byte, gzip_stream_may_be_damaged,
-                                                lazy_gzip_stream_patching_at_eof,
-                                                range_number_of_bytes, range_number_of_lines,
-                                                compression_factor);
-                if (ret_value == EXIT_OK &&
-                    do_not_delete_original_file == 0)
-                {
-                    // a file_name + ".gz" has been created, but now the original file must be deleted
-                    if (remove(file_name) != 0)
-                    {
-                        printToStderr("ERROR: Could not delete '%s'.\n", file_name);
-                        ret_value = EXIT_GENERIC_ERROR;
-                    }
-                }
                 break;
 
             case ACT_DECOMPRESS:
