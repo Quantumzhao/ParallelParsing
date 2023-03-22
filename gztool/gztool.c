@@ -4240,7 +4240,7 @@ local int action_create_index(
     char *index_filename, enum INDEX_AND_EXTRACTION_OPTIONS indx_n_extraction_opts,
     uint64_t offset, uint64_t line_number_offset, uint64_t span_between_points, int write_index_to_disk,
     int end_on_first_proper_gzip_eof, int always_create_a_complete_index,
-    int waiting_time, int force_action, int wait_for_file_creation,
+    int waiting_time, int wait_for_file_creation,
     int extend_index_with_lines, uint64_t expected_first_byte, int gzip_stream_may_be_damaged,
     bool lazy_gzip_stream_patching_at_eof,
     uint64_t range_number_of_bytes, uint64_t range_number_of_lines)
@@ -4315,16 +4315,7 @@ local int action_create_index(
             // check that destination file doesn't exist
             if (access(out_filename, F_OK) != -1)
             {
-                if (0 == force_action)
-                {
-                    printToStderr("Compress destination file '%s' already exist.\nAborted\n", out_filename);
-                    free(out_filename);
-                    return EXIT_GENERIC_ERROR;
-                }
-                else
-                {
-                    printToStderr("Using `-f` force option: Deleting '%s' ...\n", out_filename);
-                }
+                printToStderr("Using `-f` force option: Deleting '%s' ...\n", out_filename);
             }
             file_out = fopen(out_filename, "w+b");
             if (NULL == file_out)
@@ -4475,16 +4466,6 @@ local int action_create_index(
                 sprintf(output_filename, "%s", file_name);
                 output_filename[strlen(file_name) - 3] = '\0';
                 printToStderr("Decompressing to '%s'\n", output_filename);
-                // now, if output_filename already exist, we cannot proceed...
-                if (access(output_filename, F_OK) != -1)
-                {
-                    if (force_action == 0)
-                    {
-                        printToStderr("Output file name '%s' already exists.\nAborted.\n", output_filename);
-                        free(output_filename);
-                        return EXIT_GENERIC_ERROR;
-                    }
-                }
                 // destination file will be overwritten:
                 file_out = fopen(output_filename, "wb");
                 if (NULL == file_out)
@@ -4785,7 +4766,8 @@ int main(int argc, char **argv)
     char *index_filename = NULL;
     int continue_on_error = 0;
     int index_filename_indicated = 0;
-    int force_action = 0;
+    //* always overwrite the index file
+    //// int force_action = 1;
     int force_strict_order = 0;
     int write_index_to_disk = 1;
     int end_on_first_proper_gzip_eof = 0;
@@ -4850,10 +4832,6 @@ int main(int argc, char **argv)
         // or with `-c` continue waiting for data even at eof()
         case 'E':
             end_on_first_proper_gzip_eof = 1;
-            break;
-        // `-f` forces index overwriting from scratch, if one exists
-        case 'f':
-            force_action = 1;
             break;
         // First create index, the process indicated action
         case 'F':
@@ -4970,8 +4948,7 @@ int main(int argc, char **argv)
         return EXIT_INVALID_OPTION;
     }
 
-    if (write_index_to_disk == 0 &&
-        (force_action == 1 || force_strict_order == 1))
+    if (write_index_to_disk == 0)
     {
         printToStderr("ERROR: do not merge contradictory parameters `-W` and `-[fF]`.\n");
         return EXIT_INVALID_OPTION;
@@ -5214,35 +5191,20 @@ int main(int argc, char **argv)
                  ( force_action == 0 || ( force_action == 1 && write_index_to_disk == 0 ) ) )
                     printToStderr("WARNING: `-[Xx]` will be ignored because index already exists.\n" );*/
 
-            if (force_action == 0)
+            if (write_index_to_disk == 1)
             {
-                printToStderr("Index file '%s' already exists and will be used.\n", index_filename);
-                if (write_index_to_disk == 0)
+                // force_action == 1 => delete index file
+                printToStderr("Using `-f` force option: Deleting '%s' ...\n", index_filename);
+                // delete it
+                if (remove(index_filename) != 0)
                 {
-                    printToStderr("Index file will NOT be modified.\n");
-                }
-                else
-                {
-                    ; // printToStderr("(Use `-f` to force overwriting.)\n" );
+                    printToStderr("ERROR: Could not delete '%s'.\n\n", index_filename);
+                    return EXIT_GENERIC_ERROR;
                 }
             }
             else
             {
-                if (write_index_to_disk == 1)
-                {
-                    // force_action == 1 => delete index file
-                    printToStderr("Using `-f` force option: Deleting '%s' ...\n", index_filename);
-                    // delete it
-                    if (remove(index_filename) != 0)
-                    {
-                        printToStderr("ERROR: Could not delete '%s'.\n\n", index_filename);
-                        return EXIT_GENERIC_ERROR;
-                    }
-                }
-                else
-                {
-                    printToStderr("Ignoring `-f` force option with `W` on '%s' ...\n", index_filename);
-                }
+                printToStderr("Ignoring `-f` force option with `W` on '%s' ...\n", index_filename);
             }
         }
 
@@ -5271,7 +5233,7 @@ int main(int argc, char **argv)
                 ret_value = action_create_index("", &index, index_filename,
                                                 EXTRACT_FROM_BYTE, extract_from_byte, 0, span_between_points,
                                                 write_index_to_disk, end_on_first_proper_gzip_eof,
-                                                always_create_a_complete_index, waiting_time, force_action,
+                                                always_create_a_complete_index, waiting_time,
                                                 wait_for_file_creation, extend_index_with_lines,
                                                 expected_first_byte, gzip_stream_may_be_damaged,
                                                 lazy_gzip_stream_patching_at_eof,
@@ -5293,7 +5255,7 @@ int main(int argc, char **argv)
                 ret_value = action_create_index("", &index, index_filename,
                                                 EXTRACT_FROM_LINE, 0, extract_from_line, span_between_points,
                                                 write_index_to_disk, end_on_first_proper_gzip_eof,
-                                                always_create_a_complete_index, waiting_time, force_action,
+                                                always_create_a_complete_index, waiting_time,
                                                 wait_for_file_creation, extend_index_with_lines,
                                                 expected_first_byte, gzip_stream_may_be_damaged,
                                                 lazy_gzip_stream_patching_at_eof,
@@ -5315,7 +5277,7 @@ int main(int argc, char **argv)
                 ret_value = action_create_index("", &index, index_filename,
                                                 JUST_CREATE_INDEX, 0, 0, span_between_points,
                                                 write_index_to_disk, end_on_first_proper_gzip_eof,
-                                                always_create_a_complete_index, waiting_time, force_action,
+                                                always_create_a_complete_index, waiting_time,
                                                 wait_for_file_creation, extend_index_with_lines,
                                                 expected_first_byte, gzip_stream_may_be_damaged,
                                                 lazy_gzip_stream_patching_at_eof,
@@ -5326,7 +5288,7 @@ int main(int argc, char **argv)
                 ret_value = action_create_index("", &index, "",
                                                 JUST_CREATE_INDEX, 0, 0, span_between_points,
                                                 write_index_to_disk, end_on_first_proper_gzip_eof,
-                                                always_create_a_complete_index, waiting_time, force_action,
+                                                always_create_a_complete_index, waiting_time,
                                                 wait_for_file_creation, extend_index_with_lines,
                                                 expected_first_byte, gzip_stream_may_be_damaged,
                                                 lazy_gzip_stream_patching_at_eof,
@@ -5394,35 +5356,19 @@ int main(int argc, char **argv)
                      ( force_action == 0 || ( force_action == 1 && write_index_to_disk == 0 ) ) )
                         printToStderr("WARNING: `-[Xx]` will be ignored because index already exists.\n" );*/
 
-                if (force_action == 0)
+                if (write_index_to_disk == 1)
                 {
-                    printToStderr("Index file '%s' already exists and will be used.\n", index_filename);
-                    if (write_index_to_disk == 0)
+                    // delete index file
+                    printToStderr("Using `-f` force option: Deleting '%s' ...\n", index_filename);
+                    if (remove(index_filename) != 0)
                     {
-                        printToStderr("Index file will NOT be modified.\n");
-                    }
-                    else
-                    {
-                        ; // printToStderr("(Use `-f` to force overwriting.)\n" );
+                        printToStderr("ERROR: Could not delete '%s'.\nAborted.\n", index_filename);
+                        ret_value = EXIT_GENERIC_ERROR;
                     }
                 }
                 else
                 {
-                    // force_action == 1
-                    if (write_index_to_disk == 1)
-                    {
-                        // delete index file
-                        printToStderr("Using `-f` force option: Deleting '%s' ...\n", index_filename);
-                        if (remove(index_filename) != 0)
-                        {
-                            printToStderr("ERROR: Could not delete '%s'.\nAborted.\n", index_filename);
-                            ret_value = EXIT_GENERIC_ERROR;
-                        }
-                    }
-                    else
-                    {
-                        printToStderr("Ignoring `-f` force option with `W` on '%s' ...\n", index_filename);
-                    }
+                    printToStderr("Ignoring `-f` force option with `W` on '%s' ...\n", index_filename);
                 }
             }
 
@@ -5446,7 +5392,7 @@ int main(int argc, char **argv)
                 ret_value = action_create_index(file_name, &index, index_filename,
                                                 JUST_CREATE_INDEX, 0, 0, span_between_points,
                                                 write_index_to_disk, end_on_first_proper_gzip_eof,
-                                                always_create_a_complete_index, waiting_time, force_action,
+                                                always_create_a_complete_index, waiting_time,
                                                 wait_for_file_creation, extend_index_with_lines,
                                                 expected_first_byte, gzip_stream_may_be_damaged,
                                                 lazy_gzip_stream_patching_at_eof,
@@ -5466,7 +5412,7 @@ int main(int argc, char **argv)
                 ret_value = action_create_index(file_name, &index, index_filename,
                                                 EXTRACT_FROM_BYTE, extract_from_byte, 0, span_between_points,
                                                 write_index_to_disk, end_on_first_proper_gzip_eof,
-                                                always_create_a_complete_index, waiting_time, force_action,
+                                                always_create_a_complete_index, waiting_time,
                                                 wait_for_file_creation, extend_index_with_lines,
                                                 expected_first_byte, gzip_stream_may_be_damaged,
                                                 lazy_gzip_stream_patching_at_eof,
@@ -5477,7 +5423,7 @@ int main(int argc, char **argv)
                 ret_value = action_create_index(file_name, &index, index_filename,
                                                 EXTRACT_FROM_LINE, 0, extract_from_line, span_between_points,
                                                 write_index_to_disk, end_on_first_proper_gzip_eof,
-                                                always_create_a_complete_index, waiting_time, force_action,
+                                                always_create_a_complete_index, waiting_time,
                                                 wait_for_file_creation, extend_index_with_lines,
                                                 expected_first_byte, gzip_stream_may_be_damaged,
                                                 lazy_gzip_stream_patching_at_eof,
@@ -5490,7 +5436,7 @@ int main(int argc, char **argv)
                     ret_value = action_create_index(file_name, &index, index_filename,
                                                     JUST_CREATE_INDEX, 0, 0, span_between_points,
                                                     write_index_to_disk, end_on_first_proper_gzip_eof,
-                                                    always_create_a_complete_index, waiting_time, force_action,
+                                                    always_create_a_complete_index, waiting_time,
                                                     wait_for_file_creation, extend_index_with_lines,
                                                     expected_first_byte, gzip_stream_may_be_damaged,
                                                     lazy_gzip_stream_patching_at_eof,
@@ -5503,7 +5449,7 @@ int main(int argc, char **argv)
                 ret_value = action_create_index(file_name, &index, index_filename,
                                                 DECOMPRESS, 0, 0, span_between_points,
                                                 write_index_to_disk, end_on_first_proper_gzip_eof,
-                                                always_create_a_complete_index, waiting_time, force_action,
+                                                always_create_a_complete_index, waiting_time,
                                                 wait_for_file_creation, extend_index_with_lines,
                                                 expected_first_byte, gzip_stream_may_be_damaged,
                                                 lazy_gzip_stream_patching_at_eof,
