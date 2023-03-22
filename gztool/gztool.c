@@ -244,8 +244,6 @@ enum ACTION
     ACT_EXTRACT_FROM_BYTE,
     ACT_CREATE_INDEX,
     ACT_SUPERVISE,
-    ACT_EXTRACT_TAIL,
-    ACT_EXTRACT_TAIL_AND_CONTINUE,
     ACT_DECOMPRESS,
     ACT_EXTRACT_FROM_LINE
 };
@@ -4950,16 +4948,6 @@ int main(int argc, char **argv)
             action = ACT_SUPERVISE;
             actions_set++;
             break;
-        // `-t` tail file contents
-        case 't':
-            action = ACT_EXTRACT_TAIL;
-            actions_set++;
-            break;
-        // `-T` tail file contents and continue Supervising (and extracting data from) gzip file
-        case 'T':
-            action = ACT_EXTRACT_TAIL_AND_CONTINUE;
-            actions_set++;
-            break;
         // `-w` wait for file creation with `-[STcd]`
         case 'w':
             wait_for_file_creation = 1;
@@ -4972,11 +4960,6 @@ int main(int argc, char **argv)
         // using Unix newline format ('\n')  (compatible with Windows \r\n)
         case 'x':
             extend_index_with_lines = 1;
-            break;
-        // `-X` create extended index with line number information
-        // using old mac newline format ('\r')
-        case 'X':
-            extend_index_with_lines = 2;
             break;
         // `-z` create index without line number information
         case 'z':
@@ -5000,7 +4983,7 @@ int main(int argc, char **argv)
         return EXIT_INVALID_OPTION;
     }
 
-    if ((action != ACT_SUPERVISE && action != ACT_EXTRACT_TAIL_AND_CONTINUE &&
+    if ((action != ACT_SUPERVISE &&
          action != ACT_DECOMPRESS) &&
         wait_for_file_creation == 1)
     {
@@ -5051,8 +5034,6 @@ int main(int argc, char **argv)
         action == ACT_EXTRACT_FROM_BYTE ||
         action == ACT_CREATE_INDEX ||
         action == ACT_SUPERVISE ||
-        action == ACT_EXTRACT_TAIL ||
-        action == ACT_EXTRACT_TAIL_AND_CONTINUE ||
         action == ACT_EXTRACT_FROM_LINE ||
         action == ACT_DECOMPRESS
         // it's stated that "DECOMPRESS does not require index" @ action_create_index() BUT
@@ -5157,16 +5138,13 @@ int main(int argc, char **argv)
 
     if (1 == force_strict_order &&
         (action == ACT_SUPERVISE ||
-         action == ACT_EXTRACT_TAIL_AND_CONTINUE ||
          action == ACT_DECOMPRESS))
     {
         printToStderr("ERROR: Cannot use `-F` with `-[dlSTu]`.\n");
         return EXIT_INVALID_OPTION;
     }
 
-    if (true == lazy_gzip_stream_patching_at_eof &&
-        (action != ACT_SUPERVISE &&
-         action != ACT_EXTRACT_TAIL_AND_CONTINUE))
+    if (true == lazy_gzip_stream_patching_at_eof && action != ACT_SUPERVISE)
     {
         printToStderr("ERROR: without `-[ST]`, use `-p` instead of `-P`.\n");
         return EXIT_INVALID_OPTION;
@@ -5177,7 +5155,6 @@ int main(int argc, char **argv)
           action == ACT_EXTRACT_FROM_LINE ||
           action == ACT_CREATE_INDEX ||
           action == ACT_SUPERVISE ||
-          action == ACT_EXTRACT_TAIL_AND_CONTINUE ||
           action == ACT_DECOMPRESS))
     {
         printToStderr("ERROR: Cannot use `-p` without `-[bdiLST]`.\n");
@@ -5200,12 +5177,6 @@ int main(int argc, char **argv)
             break;
         case ACT_SUPERVISE:
             action_string = "Supervise still-growing file";
-            break;
-        case ACT_EXTRACT_TAIL:
-            action_string = "Extract tail data";
-            break;
-        case ACT_EXTRACT_TAIL_AND_CONTINUE:
-            action_string = "Extract from tail data from a still-growing file";
             break;
         case ACT_DECOMPRESS:
             action_string = "Decompress file";
@@ -5248,9 +5219,7 @@ int main(int argc, char **argv)
 
         // check `-f` and execute delete if index file exists
         if ((action == ACT_CREATE_INDEX || action == ACT_SUPERVISE ||
-             action == ACT_EXTRACT_TAIL_AND_CONTINUE ||
-             action == ACT_EXTRACT_FROM_BYTE || action == ACT_EXTRACT_FROM_LINE ||
-             action == ACT_EXTRACT_TAIL) &&
+             action == ACT_EXTRACT_FROM_BYTE || action == ACT_EXTRACT_FROM_LINE) &&
             1 == index_filename_indicated &&
             access(index_filename, F_OK) != -1)
         {
@@ -5408,54 +5377,6 @@ int main(int argc, char **argv)
             printToStderr("\n");
             break;
 
-        case ACT_EXTRACT_TAIL:
-            // stdin is a gzip file
-            if (index_filename_indicated == 1)
-            {
-                ret_value = action_create_index("", &index, index_filename,
-                                                EXTRACT_TAIL, 0, 0, span_between_points,
-                                                write_index_to_disk, end_on_first_proper_gzip_eof,
-                                                always_create_a_complete_index, waiting_time, force_action,
-                                                wait_for_file_creation, extend_index_with_lines,
-                                                expected_first_byte, gzip_stream_may_be_damaged,
-                                                lazy_gzip_stream_patching_at_eof,
-                                                range_number_of_bytes, range_number_of_lines);
-            }
-            else
-            {
-                // if an index filename is not indicated, index will not be output
-                // as stdout is already used for data extraction
-                printToStderr("ERROR: Index filename is needed if STDIN is used as gzip input.\nAborted.\n");
-                ret_value = EXIT_INVALID_OPTION;
-            }
-            break;
-
-        case ACT_EXTRACT_TAIL_AND_CONTINUE:
-            if (index_filename_indicated == 1)
-            {
-                ret_value = action_create_index("", &index, index_filename,
-                                                SUPERVISE_DO_AND_EXTRACT_FROM_TAIL, 0, 0, span_between_points,
-                                                write_index_to_disk, end_on_first_proper_gzip_eof,
-                                                always_create_a_complete_index, waiting_time, force_action,
-                                                wait_for_file_creation, extend_index_with_lines,
-                                                expected_first_byte, gzip_stream_may_be_damaged,
-                                                lazy_gzip_stream_patching_at_eof,
-                                                range_number_of_bytes, range_number_of_lines);
-            }
-            else
-            {
-                ret_value = action_create_index("", &index, "",
-                                                SUPERVISE_DO_AND_EXTRACT_FROM_TAIL, 0, 0, span_between_points,
-                                                write_index_to_disk, end_on_first_proper_gzip_eof,
-                                                always_create_a_complete_index, waiting_time, force_action,
-                                                wait_for_file_creation, extend_index_with_lines,
-                                                expected_first_byte, gzip_stream_may_be_damaged,
-                                                lazy_gzip_stream_patching_at_eof,
-                                                range_number_of_bytes, range_number_of_lines);
-            }
-            printToStderr("\n");
-            break;
-
         default:
             printToStderr("ERROR: action not specified.\n");
             ret_value = EXIT_GENERIC_ERROR;
@@ -5515,9 +5436,7 @@ int main(int argc, char **argv)
             }
 
             if ((action == ACT_CREATE_INDEX || action == ACT_SUPERVISE ||
-                 action == ACT_EXTRACT_TAIL_AND_CONTINUE ||
-                 action == ACT_EXTRACT_FROM_BYTE || action == ACT_EXTRACT_FROM_LINE ||
-                 action == ACT_EXTRACT_TAIL) &&
+                 action == ACT_EXTRACT_FROM_BYTE || action == ACT_EXTRACT_FROM_LINE) &&
                 access(index_filename, F_OK) != -1)
             {
                 // index file already exists
@@ -5638,66 +5557,6 @@ int main(int argc, char **argv)
                                                 expected_first_byte, gzip_stream_may_be_damaged,
                                                 lazy_gzip_stream_patching_at_eof,
                                                 range_number_of_bytes, range_number_of_lines);
-                printToStderr("\n");
-                break;
-
-            case ACT_EXTRACT_TAIL:
-                ret_value = action_create_index(file_name, &index, index_filename,
-                                                EXTRACT_TAIL, 0, 0, span_between_points,
-                                                write_index_to_disk, end_on_first_proper_gzip_eof,
-                                                always_create_a_complete_index, waiting_time, force_action,
-                                                wait_for_file_creation, extend_index_with_lines,
-                                                expected_first_byte, gzip_stream_may_be_damaged,
-                                                lazy_gzip_stream_patching_at_eof,
-                                                range_number_of_bytes, range_number_of_lines);
-                break;
-
-            case ACT_EXTRACT_TAIL_AND_CONTINUE:
-                do
-                {
-                    ret_value = action_create_index(file_name, &index, index_filename,
-                                                    SUPERVISE_DO_AND_EXTRACT_FROM_TAIL, 0, 0, span_between_points,
-                                                    write_index_to_disk, end_on_first_proper_gzip_eof,
-                                                    always_create_a_complete_index, waiting_time, force_action,
-                                                    wait_for_file_creation, extend_index_with_lines,
-                                                    expected_first_byte, gzip_stream_may_be_damaged,
-                                                    lazy_gzip_stream_patching_at_eof,
-                                                    range_number_of_bytes, range_number_of_lines);
-                    if (EXIT_FILE_OVERWRITTEN == ret_value &&
-                        (0 == write_index_to_disk ||
-                         (1 == force_action &&
-                          1 == write_index_to_disk)))
-                    {
-                        printToStderr("File overwriting detected and restarting decompression...\n");
-                        // delete index file
-                        if (NULL != index)
-                        {
-                            free_index(index);
-                            index = NULL;
-                        }
-                        if (0 == write_index_to_disk)
-                        {
-
-                            expected_first_byte = 1LLU;
-                        }
-                        else
-                        { // ( 1 == force_action && 1 == write_index_to_disk )
-
-                            printToStderr("Using `-f` force option: Overwriting '%s' ...\n", index_filename);
-                            if (remove(index_filename) != 0)
-                            {
-                                printToStderr("ERROR: Could not delete '%s'.\nAborted.\n", index_filename);
-                                ret_value = EXIT_GENERIC_ERROR;
-                                break;
-                            }
-                        }
-                    }
-                } while (EXIT_FILE_OVERWRITTEN == ret_value &&
-                         (0 == write_index_to_disk ||
-                          (1 == force_action && 1 == write_index_to_disk)));
-                // this do-while loop mimics `tail -F`:
-                // this has the side efect that `-[fW]T` may get stuck here forever
-                // unless end_on_first_proper_gzip_eof == 1
                 printToStderr("\n");
                 break;
 
