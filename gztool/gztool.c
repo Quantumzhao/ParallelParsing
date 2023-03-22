@@ -243,7 +243,6 @@ enum ACTION
     ACT_NOT_SET,
     ACT_EXTRACT_FROM_BYTE,
     ACT_CREATE_INDEX,
-    ACT_SUPERVISE,
     ACT_DECOMPRESS,
     ACT_EXTRACT_FROM_LINE
 };
@@ -4943,11 +4942,6 @@ int main(int argc, char **argv)
             }
             span_between_points = span_between_points * 1024 * 1024;
             break;
-        // `-S` supervise a still-growing gzip <FILE> and create index for it
-        case 'S':
-            action = ACT_SUPERVISE;
-            actions_set++;
-            break;
         // `-w` wait for file creation with `-[STcd]`
         case 'w':
             wait_for_file_creation = 1;
@@ -4983,9 +4977,7 @@ int main(int argc, char **argv)
         return EXIT_INVALID_OPTION;
     }
 
-    if ((action != ACT_SUPERVISE &&
-         action != ACT_DECOMPRESS) &&
-        wait_for_file_creation == 1)
+    if (action != ACT_DECOMPRESS && wait_for_file_creation == 1)
     {
         printToStderr("ERROR: `-w` only apply to `-[cdST]`\n");
         return EXIT_INVALID_OPTION;
@@ -5033,7 +5025,6 @@ int main(int argc, char **argv)
     if ( // these are the actions that can create an index
         action == ACT_EXTRACT_FROM_BYTE ||
         action == ACT_CREATE_INDEX ||
-        action == ACT_SUPERVISE ||
         action == ACT_EXTRACT_FROM_LINE ||
         action == ACT_DECOMPRESS
         // it's stated that "DECOMPRESS does not require index" @ action_create_index() BUT
@@ -5136,15 +5127,13 @@ int main(int argc, char **argv)
         }
     }
 
-    if (1 == force_strict_order &&
-        (action == ACT_SUPERVISE ||
-         action == ACT_DECOMPRESS))
+    if (1 == force_strict_order && action == ACT_DECOMPRESS)
     {
         printToStderr("ERROR: Cannot use `-F` with `-[dlSTu]`.\n");
         return EXIT_INVALID_OPTION;
     }
 
-    if (true == lazy_gzip_stream_patching_at_eof && action != ACT_SUPERVISE)
+    if (true == lazy_gzip_stream_patching_at_eof)
     {
         printToStderr("ERROR: without `-[ST]`, use `-p` instead of `-P`.\n");
         return EXIT_INVALID_OPTION;
@@ -5154,7 +5143,6 @@ int main(int argc, char **argv)
         !(action == ACT_EXTRACT_FROM_BYTE ||
           action == ACT_EXTRACT_FROM_LINE ||
           action == ACT_CREATE_INDEX ||
-          action == ACT_SUPERVISE ||
           action == ACT_DECOMPRESS))
     {
         printToStderr("ERROR: Cannot use `-p` without `-[bdiLST]`.\n");
@@ -5174,9 +5162,6 @@ int main(int argc, char **argv)
             break;
         case ACT_CREATE_INDEX:
             action_string = "Create index for a gzip file";
-            break;
-        case ACT_SUPERVISE:
-            action_string = "Supervise still-growing file";
             break;
         case ACT_DECOMPRESS:
             action_string = "Decompress file";
@@ -5218,7 +5203,7 @@ int main(int argc, char **argv)
         }
 
         // check `-f` and execute delete if index file exists
-        if ((action == ACT_CREATE_INDEX || action == ACT_SUPERVISE ||
+        if ((action == ACT_CREATE_INDEX ||
              action == ACT_EXTRACT_FROM_BYTE || action == ACT_EXTRACT_FROM_LINE) &&
             1 == index_filename_indicated &&
             access(index_filename, F_OK) != -1)
@@ -5350,33 +5335,6 @@ int main(int argc, char **argv)
             printToStderr("\n");
             break;
 
-        case ACT_SUPERVISE:
-            // stdin is a gzip file for which an index file must be created on-the-fly
-            if (index_filename_indicated == 1)
-            {
-                ret_value = action_create_index("", &index, index_filename,
-                                                SUPERVISE_DO, 0, 0, span_between_points,
-                                                write_index_to_disk, end_on_first_proper_gzip_eof,
-                                                always_create_a_complete_index, waiting_time, force_action,
-                                                wait_for_file_creation, extend_index_with_lines,
-                                                expected_first_byte, gzip_stream_may_be_damaged,
-                                                lazy_gzip_stream_patching_at_eof,
-                                                range_number_of_bytes, range_number_of_lines);
-            }
-            else
-            {
-                ret_value = action_create_index("", &index, "",
-                                                SUPERVISE_DO, 0, 0, span_between_points,
-                                                write_index_to_disk, end_on_first_proper_gzip_eof,
-                                                always_create_a_complete_index, waiting_time, force_action,
-                                                wait_for_file_creation, extend_index_with_lines,
-                                                expected_first_byte, gzip_stream_may_be_damaged,
-                                                lazy_gzip_stream_patching_at_eof,
-                                                range_number_of_bytes, range_number_of_lines);
-            }
-            printToStderr("\n");
-            break;
-
         default:
             printToStderr("ERROR: action not specified.\n");
             ret_value = EXIT_GENERIC_ERROR;
@@ -5384,15 +5342,6 @@ int main(int argc, char **argv)
     }
     else
     {
-
-        if (action == ACT_SUPERVISE &&
-            (argc - optind > 1))
-        {
-            // supervise only accepts one input gz file
-            printToStderr("`-S` option only accepts one gzip file parameter: %d indicated.\n", argc - optind);
-            printToStderr("Aborted.\n");
-            return EXIT_GENERIC_ERROR;
-        }
 
         for (i = optind; i < (uint64_t)argc; i++)
         {
@@ -5435,7 +5384,7 @@ int main(int argc, char **argv)
                 index = NULL;
             }
 
-            if ((action == ACT_CREATE_INDEX || action == ACT_SUPERVISE ||
+            if ((action == ACT_CREATE_INDEX ||
                  action == ACT_EXTRACT_FROM_BYTE || action == ACT_EXTRACT_FROM_LINE) &&
                 access(index_filename, F_OK) != -1)
             {
@@ -5548,18 +5497,6 @@ int main(int argc, char **argv)
                                                     range_number_of_bytes, range_number_of_lines);
                 break;
 
-            case ACT_SUPERVISE:
-                ret_value = action_create_index(file_name, &index, index_filename,
-                                                SUPERVISE_DO, 0, 0, span_between_points,
-                                                write_index_to_disk, end_on_first_proper_gzip_eof,
-                                                always_create_a_complete_index, waiting_time, force_action,
-                                                wait_for_file_creation, extend_index_with_lines,
-                                                expected_first_byte, gzip_stream_may_be_damaged,
-                                                lazy_gzip_stream_patching_at_eof,
-                                                range_number_of_bytes, range_number_of_lines);
-                printToStderr("\n");
-                break;
-
             case ACT_DECOMPRESS:
                 // `gztool -d` is just an alias for `gztool -b0` > file_name without extension
                 // and deletion of file_name.
@@ -5606,15 +5543,6 @@ int main(int argc, char **argv)
                 printToStderr("ERROR: action not specified.\n");
                 ret_value = EXIT_GENERIC_ERROR;
             }
-
-            //// if ( action == ACT_LIST_INFO ) {
-            ////     // as ACT_LIST_INFO prints to stdout,
-            ////     // file input separator must be printed also to stdout
-            ////     if ( verbosity_level >= VERBOSITY_NORMAL )
-            ////         fprintf( stdout, "\n" );
-            //// } else {
-            ////     printToStderr("\n" );
-            //// }
 
             if (ret_value != EXIT_OK)
                 count_errors++;
