@@ -4443,7 +4443,6 @@ int main(int argc, char **argv)
     uint64_t range_number_of_bytes = 0LLU;
     uint64_t range_number_of_lines = 0LLU;
     char *index_filename = NULL;
-    int continue_on_error = 0;
     int index_filename_indicated = 0;
     //* always overwrite the index file
     //// int force_action = 1;
@@ -4453,14 +4452,12 @@ int main(int argc, char **argv)
     int end_on_first_proper_gzip_eof = 0;
     int always_create_a_complete_index = 0;
     int wait_for_file_creation = 0;
-    int waiting_time = WAITING_TIME;
     int do_not_delete_original_file = 0;
     int extend_index_with_lines = 0;
     bool force_index_without_lines = false; // marks `-z` use
     int gzip_stream_may_be_damaged = 0;
     bool lazy_gzip_stream_patching_at_eof = false;
     bool indicate_range_in_absolute_value = false;
-    uint64_t count_errors = 0;
 
     enum EXIT_RETURNED_VALUES ret_value;
     enum ACTION action;
@@ -4474,16 +4471,6 @@ int main(int argc, char **argv)
     while ((opt = getopt(argc, argv, "123456789a:Ab:cCdDeEfFhiI:lL:n:pPr:R:s:StTu:v:wWxXz")) != -1)
         switch (opt)
         {
-        // `-a #` default waiting time in seconds when supervising a growing gzip file (`-[ST]`)
-        case 'a':
-            waiting_time = (int)strtol(optarg, NULL, 10);
-            if (waiting_time == 0 &&
-                (strlen(optarg) != 1 || '0' != optarg[0]))
-            {
-                printToStderr("ERROR: Invalid awaiting value of '%s'\n", optarg);
-                return EXIT_INVALID_OPTION;
-            }
-            break;
         // `-A` modifies `-[rR]` to indicate the range of bytes/lines in
         // absolute values, instead of the default incremental values.
         case 'A':
@@ -4498,10 +4485,6 @@ int main(int argc, char **argv)
         // `-C` generates always a complete index file, ignoring possible decompression errors
         case 'C':
             always_create_a_complete_index = 1;
-            break;
-        // `-e` continues on error if multiple input files indicated
-        case 'e':
-            continue_on_error = 1;
             break;
         // `-E` ends gzip processing on first proper (at feof()) GZIP EOF,
         // or with `-c` continue waiting for data even at eof()
@@ -4622,12 +4605,6 @@ int main(int argc, char **argv)
     if (wait_for_file_creation == 1)
     {
         printToStderr("ERROR: `-w` only apply to `-[cdST]`\n");
-        return EXIT_INVALID_OPTION;
-    }
-
-    if ((unsigned int)waiting_time >= UINT32_MAX || waiting_time < 0)
-    {
-        printToStderr("ERROR: Invalid awaiting value of '%d'\n", waiting_time);
         return EXIT_INVALID_OPTION;
     }
 
@@ -4878,7 +4855,7 @@ int main(int argc, char **argv)
                 ret_value = action_create_index("", &index, index_filename,
                                                 EXTRACT_FROM_BYTE, extract_from_byte, 0, span_between_points,
                                                 end_on_first_proper_gzip_eof,
-                                                always_create_a_complete_index, waiting_time,
+                                                always_create_a_complete_index, WAITING_TIME,
                                                 wait_for_file_creation, extend_index_with_lines,
                                                 expected_first_byte, gzip_stream_may_be_damaged,
                                                 lazy_gzip_stream_patching_at_eof,
@@ -4900,7 +4877,7 @@ int main(int argc, char **argv)
                 ret_value = action_create_index("", &index, index_filename,
                                                 EXTRACT_FROM_LINE, 0, extract_from_line, span_between_points,
                                                 end_on_first_proper_gzip_eof,
-                                                always_create_a_complete_index, waiting_time,
+                                                always_create_a_complete_index, WAITING_TIME,
                                                 wait_for_file_creation, extend_index_with_lines,
                                                 expected_first_byte, gzip_stream_may_be_damaged,
                                                 lazy_gzip_stream_patching_at_eof,
@@ -4922,7 +4899,7 @@ int main(int argc, char **argv)
                 ret_value = action_create_index("", &index, index_filename,
                                                 JUST_CREATE_INDEX, 0, 0, span_between_points,
                                                 end_on_first_proper_gzip_eof,
-                                                always_create_a_complete_index, waiting_time,
+                                                always_create_a_complete_index, WAITING_TIME,
                                                 wait_for_file_creation, extend_index_with_lines,
                                                 expected_first_byte, gzip_stream_may_be_damaged,
                                                 lazy_gzip_stream_patching_at_eof,
@@ -4933,7 +4910,7 @@ int main(int argc, char **argv)
                 ret_value = action_create_index("", &index, "",
                                                 JUST_CREATE_INDEX, 0, 0, span_between_points,
                                                 end_on_first_proper_gzip_eof,
-                                                always_create_a_complete_index, waiting_time,
+                                                always_create_a_complete_index, WAITING_TIME,
                                                 wait_for_file_creation, extend_index_with_lines,
                                                 expected_first_byte, gzip_stream_may_be_damaged,
                                                 lazy_gzip_stream_patching_at_eof,
@@ -4949,163 +4926,142 @@ int main(int argc, char **argv)
     }
     else
     {
+        file_name = argv[optind];
 
-        for (i = optind; i < (uint64_t)argc; i++)
+        ret_value = EXIT_OK;
+
+        // if no index filename is set (`-I`), it is derived from each <FILE> parameter
+        if (0 == index_filename_indicated)
         {
 
-            file_name = argv[i];
-
-            ret_value = EXIT_OK;
-
-            // if no index filename is set (`-I`), it is derived from each <FILE> parameter
-            if (0 == index_filename_indicated)
+            if (NULL != index_filename)
             {
-
-                if (NULL != index_filename)
-                {
-                    free(index_filename);
-                    index_filename = NULL;
-                }
-                index_filename = malloc(strlen(argv[i]) + 4 + 1);
-                sprintf(index_filename, "%s", argv[i]);
-
-                if (strlen(argv[i]) > 3 && // avoid out-of-bounds
-                    (char *)strstr(index_filename, ".gz") ==
-                        (char *)(index_filename + strlen(argv[i]) - 3))
-                    // if gzip-file name is 'FILE.gz', index file name will be 'FILE.gzi'
-                    sprintf(index_filename, "%si", argv[i]);
-                else
-                    // otherwise, the complete extension '.gzi' is appended
-                    sprintf(index_filename, "%s.gzi", argv[i]);
+                free(index_filename);
+                index_filename = NULL;
             }
+            index_filename = malloc(strlen(argv[i]) + 4 + 1);
+            sprintf(index_filename, "%s", argv[i]);
 
-            // free previous loop's resources
-            if (NULL != in)
+            if (strlen(argv[i]) > 3 && // avoid out-of-bounds
+                (char *)strstr(index_filename, ".gz") ==
+                    (char *)(index_filename + strlen(argv[i]) - 3))
+                // if gzip-file name is 'FILE.gz', index file name will be 'FILE.gzi'
+                sprintf(index_filename, "%si", argv[i]);
+            else
+                // otherwise, the complete extension '.gzi' is appended
+                sprintf(index_filename, "%s.gzi", argv[i]);
+        }
+
+        // free previous loop's resources
+        if (NULL != in)
+        {
+            fclose(in);
+            in = NULL;
+        }
+        if (NULL != index)
+        {
+            free_index(index);
+            index = NULL;
+        }
+
+        if ((action == ACT_CREATE_INDEX ||
+                action == ACT_EXTRACT_FROM_BYTE || action == ACT_EXTRACT_FROM_LINE) &&
+            access(index_filename, F_OK) != -1)
+        {
+            // index file already exists
+
+            /*if ( ( extend_index_with_lines > 0 && action != ACT_EXTRACT_FROM_LINE ) &&
+                    ( force_action == 0 || ( force_action == 1 && write_index_to_disk == 0 ) ) )
+                    printToStderr("WARNING: `-[Xx]` will be ignored because index already exists.\n" );*/
+
+            // delete index file
+            printToStderr("Using `-f` force option: Deleting '%s' ...\n", index_filename);
+            if (remove(index_filename) != 0)
             {
-                fclose(in);
-                in = NULL;
+                printToStderr("ERROR: Could not delete '%s'.\nAborted.\n", index_filename);
+                ret_value = EXIT_GENERIC_ERROR;
             }
-            if (NULL != index)
-            {
-                free_index(index);
-                index = NULL;
-            }
+        }
 
-            if ((action == ACT_CREATE_INDEX ||
-                 action == ACT_EXTRACT_FROM_BYTE || action == ACT_EXTRACT_FROM_LINE) &&
-                access(index_filename, F_OK) != -1)
-            {
-                // index file already exists
+        // check possible errors and `-e` before proceed
+        if (ret_value != EXIT_OK)
+        {
+            goto end_of_ifelse;
+        }
 
-                /*if ( ( extend_index_with_lines > 0 && action != ACT_EXTRACT_FROM_LINE ) &&
-                     ( force_action == 0 || ( force_action == 1 && write_index_to_disk == 0 ) ) )
-                        printToStderr("WARNING: `-[Xx]` will be ignored because index already exists.\n" );*/
-
-                // delete index file
-                printToStderr("Using `-f` force option: Deleting '%s' ...\n", index_filename);
-                if (remove(index_filename) != 0)
-                {
-                    printToStderr("ERROR: Could not delete '%s'.\nAborted.\n", index_filename);
-                    ret_value = EXIT_GENERIC_ERROR;
-                }
-            }
-
-            // check possible errors and `-e` before proceed
+        // create index first if `-F`
+        // (checking of conformity between `-F` and action has been done before)
+        if (force_strict_order == 1)
+        {
+            ret_value = action_create_index(file_name, &index, index_filename,
+                                            JUST_CREATE_INDEX, 0, 0, span_between_points,
+                                            end_on_first_proper_gzip_eof,
+                                            always_create_a_complete_index, WAITING_TIME,
+                                            wait_for_file_creation, extend_index_with_lines,
+                                            expected_first_byte, gzip_stream_may_be_damaged,
+                                            lazy_gzip_stream_patching_at_eof,
+                                            range_number_of_bytes, range_number_of_lines);
             if (ret_value != EXIT_OK)
             {
-                if (continue_on_error == 1)
-                {
-                    continue;
-                }
-                else
-                {
-                    break; // breaks for() loop
-                }
+                printToStderr("ERROR: Could not create index '%s'.\nAborted.\n", index_filename);
+                goto end_of_ifelse; // breaks for() loop
             }
+        }
 
-            // create index first if `-F`
-            // (checking of conformity between `-F` and action has been done before)
-            if (force_strict_order == 1)
-            {
+        // "-bil" options can accept multiple files
+        switch (action)
+        {
+
+        case ACT_EXTRACT_FROM_BYTE:
+            ret_value = action_create_index(file_name, &index, index_filename,
+                                            EXTRACT_FROM_BYTE, extract_from_byte, 0, span_between_points,
+                                            end_on_first_proper_gzip_eof,
+                                            always_create_a_complete_index, WAITING_TIME,
+                                            wait_for_file_creation, extend_index_with_lines,
+                                            expected_first_byte, gzip_stream_may_be_damaged,
+                                            lazy_gzip_stream_patching_at_eof,
+                                            range_number_of_bytes, range_number_of_lines);
+            break;
+
+        case ACT_EXTRACT_FROM_LINE:
+            ret_value = action_create_index(file_name, &index, index_filename,
+                                            EXTRACT_FROM_LINE, 0, extract_from_line, span_between_points,
+                                            end_on_first_proper_gzip_eof,
+                                            always_create_a_complete_index, WAITING_TIME,
+                                            wait_for_file_creation, extend_index_with_lines,
+                                            expected_first_byte, gzip_stream_may_be_damaged,
+                                            lazy_gzip_stream_patching_at_eof,
+                                            range_number_of_bytes, range_number_of_lines);
+            break;
+
+        case ACT_CREATE_INDEX:
+            if (force_strict_order == 0)
+                // if force_strict_order == 1 action has already been done!
                 ret_value = action_create_index(file_name, &index, index_filename,
                                                 JUST_CREATE_INDEX, 0, 0, span_between_points,
                                                 end_on_first_proper_gzip_eof,
-                                                always_create_a_complete_index, waiting_time,
+                                                always_create_a_complete_index, WAITING_TIME,
                                                 wait_for_file_creation, extend_index_with_lines,
                                                 expected_first_byte, gzip_stream_may_be_damaged,
                                                 lazy_gzip_stream_patching_at_eof,
                                                 range_number_of_bytes, range_number_of_lines);
-                if (ret_value != EXIT_OK)
-                {
-                    printToStderr("ERROR: Could not create index '%s'.\nAborted.\n", index_filename);
-                    break; // breaks for() loop
-                }
-            }
+            break;
 
-            // "-bil" options can accept multiple files
-            switch (action)
-            {
-
-            case ACT_EXTRACT_FROM_BYTE:
-                ret_value = action_create_index(file_name, &index, index_filename,
-                                                EXTRACT_FROM_BYTE, extract_from_byte, 0, span_between_points,
-                                                end_on_first_proper_gzip_eof,
-                                                always_create_a_complete_index, waiting_time,
-                                                wait_for_file_creation, extend_index_with_lines,
-                                                expected_first_byte, gzip_stream_may_be_damaged,
-                                                lazy_gzip_stream_patching_at_eof,
-                                                range_number_of_bytes, range_number_of_lines);
-                break;
-
-            case ACT_EXTRACT_FROM_LINE:
-                ret_value = action_create_index(file_name, &index, index_filename,
-                                                EXTRACT_FROM_LINE, 0, extract_from_line, span_between_points,
-                                                end_on_first_proper_gzip_eof,
-                                                always_create_a_complete_index, waiting_time,
-                                                wait_for_file_creation, extend_index_with_lines,
-                                                expected_first_byte, gzip_stream_may_be_damaged,
-                                                lazy_gzip_stream_patching_at_eof,
-                                                range_number_of_bytes, range_number_of_lines);
-                break;
-
-            case ACT_CREATE_INDEX:
-                if (force_strict_order == 0)
-                    // if force_strict_order == 1 action has already been done!
-                    ret_value = action_create_index(file_name, &index, index_filename,
-                                                    JUST_CREATE_INDEX, 0, 0, span_between_points,
-                                                    end_on_first_proper_gzip_eof,
-                                                    always_create_a_complete_index, waiting_time,
-                                                    wait_for_file_creation, extend_index_with_lines,
-                                                    expected_first_byte, gzip_stream_may_be_damaged,
-                                                    lazy_gzip_stream_patching_at_eof,
-                                                    range_number_of_bytes, range_number_of_lines);
-                break;
-
-            default:
-                printToStderr("ERROR: action not specified.\n");
-                ret_value = EXIT_GENERIC_ERROR;
-            }
-
-            if (ret_value != EXIT_OK)
-                count_errors++;
-
-            if (continue_on_error == 0 &&
-                ret_value != EXIT_OK)
-            {
-                printToStderr("Aborted.\n");
-                // break the for loop
-                break;
-            }
+        default:
+            printToStderr("ERROR: action not specified.\n");
+            ret_value = EXIT_GENERIC_ERROR;
         }
+
+        if (ret_value != EXIT_OK)
+        {
+            printToStderr("Aborted.\n");
+            // break the for loop
+            printToStderr("file processed with errors!\n");
+            printToStderr("\n");
+        }
+
+end_of_ifelse:
     }
-
-    if (i > (uint64_t)optind)
-        printToStderr("%llu files processed\n",
-                      (i - optind + ((count_errors > 0 && continue_on_error == 0) ? 1 : 0)));
-    if (count_errors > 0)
-        printToStderr("%llu files processed with errors!\n", count_errors);
-
-    printToStderr("\n");
 
     // final freeing of resources
     if (NULL != in)
@@ -5121,14 +5077,5 @@ int main(int argc, char **argv)
         free(index_filename);
     }
 
-    if (i > (uint64_t)(1 + optind - ((count_errors > 0 && continue_on_error == 0) ? 1 : 0)))
-    {
-        // if processing multiple files, return EXIT_GENERIC_ERROR if any one failed:
-        if (count_errors > 0)
-            return EXIT_GENERIC_ERROR;
-        else
-            return EXIT_OK;
-    }
-    else
-        return ret_value;
+    return ret_value;
 }
