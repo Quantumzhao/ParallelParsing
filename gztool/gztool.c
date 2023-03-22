@@ -242,8 +242,6 @@ enum ACTION
 {
     ACT_NOT_SET,
     ACT_EXTRACT_FROM_BYTE,
-    ACT_COMPRESS_CHUNK,
-    ACT_DECOMPRESS_CHUNK,
     ACT_CREATE_INDEX,
     ACT_SUPERVISE,
     ACT_EXTRACT_TAIL,
@@ -3682,87 +3680,6 @@ deserialize_index_from_file_error:
     return NULL;
 }
 
-// Compress source stream to dest stream using zlib compression format
-// that is, with 2-byte header and adler-32 crc, or raw format.
-// based on def from zlib/examples/zpipe.c by Mark Adler
-/* Compress from file source to file dest until EOF on source.
-   def() returns Z_OK on success, Z_MEM_ERROR if memory could not be
-   allocated for processing, Z_STREAM_ERROR if an invalid compression
-   level is supplied, Z_VERSION_ERROR if the version of zlib.h and the
-   version of the library linked do not match, or Z_ERRNO if there is
-   an error reading or writing the files. */
-// INPUT:
-// FILE *source  : source stream
-// FILE *dest    : destination stream
-// int level     : level of compression
-// int raw_method: 0: zlib compression (header+Adler-32)
-//                 1: raw compression (no header nor tail)
-// OUTPUT:
-// Z_* error code or Z_OK on success
-local int compress_file(FILE *source, FILE *dest)
-{
-    int ret, flush;
-    unsigned have;
-    z_stream strm;
-    unsigned char *in;
-    unsigned char *out;
-
-    /* allocate deflate state */
-    strm.zalloc = Z_NULL;
-    strm.zfree = Z_NULL;
-    strm.opaque = Z_NULL;
-    ret = deflateInit(&strm, 0);
-    if (ret != Z_OK)
-        return ret;
-
-    in = malloc(CHUNK);
-    out = malloc(CHUNK);
-
-    /* compress until end of file */
-    do
-    {
-        strm.avail_in = fread(in, 1, CHUNK, source);
-        if (ferror(source))
-        {
-            (void)deflateEnd(&strm);
-            goto compress_file_error;
-        }
-        flush = feof(source) ? Z_FINISH : Z_NO_FLUSH;
-        strm.next_in = in;
-
-        /* run deflate() on input until output buffer not full, finish
-           compression if all of source has been read in */
-        do
-        {
-            strm.avail_out = CHUNK;
-            strm.next_out = out;
-            ret = deflate(&strm, flush);   /* no bad return value */
-            assert(ret != Z_STREAM_ERROR); /* state not clobbered */
-            have = CHUNK - strm.avail_out;
-            if (fwrite(out, 1, have, dest) != have || ferror(dest))
-            {
-                (void)deflateEnd(&strm);
-                goto compress_file_error;
-            }
-        } while (strm.avail_out == 0);
-        assert(strm.avail_in == 0); /* all input will be used */
-
-        /* done when last data in file processed */
-    } while (flush != Z_FINISH);
-    assert(ret == Z_STREAM_END); /* stream will be complete */
-
-    /* clean up and return */
-    (void)deflateEnd(&strm);
-    free(in);
-    free(out);
-    return Z_OK;
-
-compress_file_error:
-    free(in);
-    free(out);
-    return Z_ERRNO;
-}
-
 // Decompress source stream to dest stream using zlib compression format
 // that is, with 2-byte header and adler-32 crc, or raw format.
 // based on inf from zlib/examples/zpipe.c by Mark Adler
@@ -5091,16 +5008,6 @@ int main(int argc, char **argv)
         return EXIT_INVALID_OPTION;
     }
 
-    if ((action == ACT_COMPRESS_CHUNK || action == ACT_DECOMPRESS_CHUNK) &&
-        (force_action == 1 || force_strict_order == 1 || write_index_to_disk == 0 ||
-         span_between_points != SPAN || index_filename_indicated == 1 ||
-         end_on_first_proper_gzip_eof == 1 || always_create_a_complete_index == 1 ||
-         waiting_time != WAITING_TIME))
-    {
-        printToStderr("ERROR: `-[aCEfFIsW]` does not apply to `-u`\n");
-        return EXIT_INVALID_OPTION;
-    }
-
     if ((unsigned int)waiting_time >= UINT32_MAX || waiting_time < 0)
     {
         printToStderr("ERROR: Invalid awaiting value of '%d'\n", waiting_time);
@@ -5116,19 +5023,6 @@ int main(int argc, char **argv)
     if (span_between_points <= 0)
     {
         printToStderr("ERROR: Invalid `-s` parameter value: '%llu'\n", span_between_points);
-        return EXIT_INVALID_OPTION;
-    }
-    if (span_between_points != SPAN &&
-        (action == ACT_COMPRESS_CHUNK || action == ACT_DECOMPRESS_CHUNK))
-    {
-        printToStderr("ERROR: `-s` parameter does not apply to `-[lu]`.\n");
-        return EXIT_INVALID_OPTION;
-    }
-
-    if ((extend_index_with_lines > 0 || true == force_index_without_lines) &&
-        (action == ACT_COMPRESS_CHUNK || action == ACT_DECOMPRESS_CHUNK))
-    {
-        printToStderr("ERROR: `-[xXz]` parameters do not apply to `-[lu]`.\n");
         return EXIT_INVALID_OPTION;
     }
 
@@ -5264,8 +5158,6 @@ int main(int argc, char **argv)
     if (1 == force_strict_order &&
         (action == ACT_SUPERVISE ||
          action == ACT_EXTRACT_TAIL_AND_CONTINUE ||
-         action == ACT_COMPRESS_CHUNK ||
-         action == ACT_DECOMPRESS_CHUNK ||
          action == ACT_DECOMPRESS))
     {
         printToStderr("ERROR: Cannot use `-F` with `-[dlSTu]`.\n");
@@ -5302,12 +5194,6 @@ int main(int argc, char **argv)
         {
         case ACT_EXTRACT_FROM_BYTE:
             action_string = "Extract from byte = ";
-            break;
-        case ACT_COMPRESS_CHUNK:
-            action_string = "zlib compress";
-            break;
-        case ACT_DECOMPRESS_CHUNK:
-            action_string = "zlib decompress";
             break;
         case ACT_CREATE_INDEX:
             action_string = "Create index for a gzip file";
@@ -5467,34 +5353,6 @@ int main(int argc, char **argv)
                 ret_value = EXIT_GENERIC_ERROR;
                 break;
             }
-
-        case ACT_COMPRESS_CHUNK:
-            // compress chunk reads stdin or indicated file, and deflates in raw to stdout
-            // If we're here it's because stdin will be used
-            SET_BINARY_MODE(STDOUT); // sets binary mode for stdout in Windows
-            SET_BINARY_MODE(STDIN);  // sets binary mode for stdout in Windows
-            if (Z_OK != compress_file(stdin, stdout))
-            {
-                printToStderr("ERROR while compressing STDIN.\nAborted.\n\n");
-                ret_value = EXIT_GENERIC_ERROR;
-                break;
-            }
-            ret_value = EXIT_OK;
-            break;
-
-        case ACT_DECOMPRESS_CHUNK:
-            // compress chunk reads stdin or indicated file, and deflates in raw to stdout
-            // If we're here it's because stdin will be used
-            SET_BINARY_MODE(STDOUT); // sets binary mode for stdout in Windows
-            SET_BINARY_MODE(STDIN);  // sets binary mode for stdout in Windows
-            if (Z_OK != decompress_file(stdin, stdout))
-            {
-                printToStderr("ERROR while decompressing STDIN.\nAborted.\n\n");
-                ret_value = EXIT_GENERIC_ERROR;
-                break;
-            }
-            ret_value = EXIT_OK;
-            break;
 
         case ACT_CREATE_INDEX:
             // stdin is a gzip file that must be indexed
@@ -5756,40 +5614,6 @@ int main(int argc, char **argv)
                                                 expected_first_byte, gzip_stream_may_be_damaged,
                                                 lazy_gzip_stream_patching_at_eof,
                                                 range_number_of_bytes, range_number_of_lines);
-                break;
-
-            case ACT_COMPRESS_CHUNK:
-                // compress chunk reads stdin or indicated file, and deflates in raw to stdout
-                // If we're here it's because there's an input file_name (at least one)
-                if (NULL == (in = fopen(file_name, "rb")))
-                {
-                    printToStderr("ERROR while opening file '%s'\n", file_name);
-                    ret_value = EXIT_GENERIC_ERROR;
-                    break;
-                }
-                SET_BINARY_MODE(STDOUT); // sets binary mode for stdout in Windows
-                if (Z_OK != compress_file(in, stdout))
-                {
-                    printToStderr("ERROR while compressing '%s'\n", file_name);
-                    ret_value = EXIT_GENERIC_ERROR;
-                }
-                break;
-
-            case ACT_DECOMPRESS_CHUNK:
-                // compress chunk reads stdin or indicated file, and deflates in raw to stdout
-                // If we're here it's because there's an input file_name (at least one)
-                if (NULL == (in = fopen(file_name, "rb")))
-                {
-                    printToStderr("ERROR while opening file '%s'\n", file_name);
-                    ret_value = EXIT_GENERIC_ERROR;
-                    break;
-                }
-                SET_BINARY_MODE(STDOUT); // sets binary mode for stdout in Windows
-                if (Z_OK != decompress_file(in, stdout))
-                {
-                    printToStderr("ERROR while decompressing '%s'\n", file_name);
-                    ret_value = EXIT_GENERIC_ERROR;
-                }
                 break;
 
             case ACT_CREATE_INDEX:
