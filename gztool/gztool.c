@@ -955,7 +955,6 @@ int serialize_index_to_file(FILE *output_file, struct access *index, uint64_t in
 // 0 on error, 1 on success
 int check_index_file(struct access *index, char *file_name, char *index_filename)
 {
-
     if (NULL != file_name &&
         strlen(file_name) > 0)
     {
@@ -4444,15 +4443,10 @@ int main(int argc, char **argv)
     uint64_t range_number_of_lines = 0LLU;
     char *index_filename = NULL;
     int index_filename_indicated = 0;
-    //* always overwrite the index file
-    //// int force_action = 1;
     int force_strict_order = 0;
-    //* always force write to disk
-    //// int write_index_to_disk = 1;
     int end_on_first_proper_gzip_eof = 0;
     int always_create_a_complete_index = 0;
     int wait_for_file_creation = 0;
-    int do_not_delete_original_file = 0;
     int extend_index_with_lines = 0;
     bool force_index_without_lines = false; // marks `-z` use
     int gzip_stream_may_be_damaged = 0;
@@ -4469,6 +4463,7 @@ int main(int argc, char **argv)
     action = ACT_NOT_SET;
     ret_value = EXIT_OK;
     while ((opt = getopt(argc, argv, "123456789a:Ab:cCdDeEfFhiI:lL:n:pPr:R:s:StTu:v:wWxXz")) != -1)
+    {
         switch (opt)
         {
         // `-A` modifies `-[rR]` to indicate the range of bytes/lines in
@@ -4595,6 +4590,7 @@ int main(int argc, char **argv)
             printToStderr("\n");
             abort();
         }
+    }
 
     if (actions_set > 1)
     {
@@ -4605,12 +4601,6 @@ int main(int argc, char **argv)
     if (wait_for_file_creation == 1)
     {
         printToStderr("ERROR: `-w` only apply to `-[cdST]`\n");
-        return EXIT_INVALID_OPTION;
-    }
-
-    if (do_not_delete_original_file == 1)
-    {
-        printToStderr("ERROR: `-D` option invalid when not using `-[cd]`\n");
         return EXIT_INVALID_OPTION;
     }
 
@@ -4770,229 +4760,136 @@ int main(int argc, char **argv)
      * end of "Checking parameter merging and absence"
      */
 
-    { // inform action on stderr:
-        char *action_string = NULL;
-        switch (action)
+    // inform action on stderr:
+    char *action_string = NULL;
+    switch (action)
+    {
+    case ACT_EXTRACT_FROM_BYTE:
+        action_string = "Extract from byte = ";
+        break;
+    case ACT_CREATE_INDEX:
+        action_string = "Create index for a gzip file";
+        break;
+    case ACT_EXTRACT_FROM_LINE:
+        action_string = "Extract from line = ";
+        break;
+    default:
+        printToStderr("ERROR: Unexpected error! No action specified.\n");
+        return EXIT_GENERIC_ERROR;
+    }
+    switch (action)
+    {
+    case ACT_EXTRACT_FROM_BYTE:
+        printToStderr("ACTION: %s%llu", action_string, extract_from_byte);
+        if (expected_first_byte > 1)
         {
-        case ACT_EXTRACT_FROM_BYTE:
-            action_string = "Extract from byte = ";
-            break;
-        case ACT_CREATE_INDEX:
-            action_string = "Create index for a gzip file";
-            break;
-        case ACT_EXTRACT_FROM_LINE:
-            action_string = "Extract from line = ";
-            break;
-        default:
-            printToStderr("ERROR: Unexpected error! No action specified.\n");
-            return EXIT_GENERIC_ERROR;
+            printToStderr(" (input - %llu bytes)", expected_first_byte - 1);
         }
-        switch (action)
-        {
-        case ACT_EXTRACT_FROM_BYTE:
-            printToStderr("ACTION: %s%llu", action_string, extract_from_byte);
-            if (expected_first_byte > 1)
-            {
-                printToStderr(" (input - %llu bytes)", expected_first_byte - 1);
-            }
-            printToStderr("\n\n");
-            break;
-        case ACT_EXTRACT_FROM_LINE:
-            printToStderr("ACTION: %s%llu\n\n", action_string, extract_from_line);
-            break;
-        default:
-            printToStderr("ACTION: %s\n\n", action_string);
-        }
+        printToStderr("\n\n");
+        break;
+    case ACT_EXTRACT_FROM_LINE:
+        printToStderr("ACTION: %s%llu\n\n", action_string, extract_from_line);
+        break;
+    default:
+        printToStderr("ACTION: %s\n\n", action_string);
     }
 
-    if (optind == argc || argc == 1)
+    file_name = argv[optind];
+
+    // if no index filename is set (`-I`), it is derived from each <FILE> parameter
+    if (0 == index_filename_indicated)
     {
-        // file input is stdin
-
-        // `-p` cannot operate with STDIN input
-        if (gzip_stream_may_be_damaged > 0)
+        if (NULL != index_filename)
         {
-            printToStderr("ERROR: `-p` cannot proceed with STDIN.\n");
-            return EXIT_GENERIC_ERROR;
+            free(index_filename);
+            index_filename = NULL;
         }
+        index_filename = malloc(strlen(argv[i]) + 4 + 1);
+        sprintf(index_filename, "%s", argv[i]);
 
-        // check `-f` and execute delete if index file exists
-        if ((action == ACT_CREATE_INDEX ||
-             action == ACT_EXTRACT_FROM_BYTE || action == ACT_EXTRACT_FROM_LINE) &&
-            1 == index_filename_indicated &&
-            access(index_filename, F_OK) != -1)
+        if (strlen(argv[i]) > 3 && // avoid out-of-bounds
+            (char *)strstr(index_filename, ".gz") ==
+                (char *)(index_filename + strlen(argv[i]) - 3))
+            // if gzip-file name is 'FILE.gz', index file name will be 'FILE.gzi'
+            sprintf(index_filename, "%si", argv[i]);
+        else
+            // otherwise, the complete extension '.gzi' is appended
+            sprintf(index_filename, "%s.gzi", argv[i]);
+    }
+
+    if ((action == ACT_CREATE_INDEX ||
+            action == ACT_EXTRACT_FROM_BYTE || action == ACT_EXTRACT_FROM_LINE) &&
+        access(index_filename, F_OK) != -1)
+    {
+        // index file already exists
+
+        /*if ( ( extend_index_with_lines > 0 && action != ACT_EXTRACT_FROM_LINE ) &&
+                ( force_action == 0 || ( force_action == 1 && write_index_to_disk == 0 ) ) )
+                printToStderr("WARNING: `-[Xx]` will be ignored because index already exists.\n" );*/
+
+        // delete index file
+        printToStderr("Using `-f` force option: Deleting '%s' ...\n", index_filename);
+        if (remove(index_filename) != 0)
         {
-            // index file already exists
-
-            /*if ( ( extend_index_with_lines > 0 && action != ACT_EXTRACT_FROM_LINE ) &&
-                 ( force_action == 0 || ( force_action == 1 && write_index_to_disk == 0 ) ) )
-                    printToStderr("WARNING: `-[Xx]` will be ignored because index already exists.\n" );*/
-
-                // force_action == 1 => delete index file
-            // delete it
-            if (remove(index_filename) != 0)
-            {
-                printToStderr("ERROR: Could not delete '%s'.\n\n", index_filename);
-                return EXIT_GENERIC_ERROR;
-            }
-        }
-
-        // `-F` has no sense with stdin
-        if (force_strict_order == 1)
-        {
-            printToStderr("WARNING: There is no sense in using `-F` with STDIN input: ignoring `F`.\n");
-            force_strict_order = 0;
-        }
-
-        // file input is stdin
-        switch (action)
-        {
-
-        case ACT_EXTRACT_FROM_BYTE:
-            // stdin is a gzip file
-            if (index_filename_indicated == 1)
-            {
-                ret_value = action_create_index("", &index, index_filename,
-                                                EXTRACT_FROM_BYTE, extract_from_byte, 0, span_between_points,
-                                                end_on_first_proper_gzip_eof,
-                                                always_create_a_complete_index, WAITING_TIME,
-                                                wait_for_file_creation, extend_index_with_lines,
-                                                expected_first_byte, gzip_stream_may_be_damaged,
-                                                lazy_gzip_stream_patching_at_eof,
-                                                range_number_of_bytes, range_number_of_lines);
-                printToStderr("\n");
-                break;
-            }
-            else
-            {
-                printToStderr("ERROR: `-I INDEX` must be used when extracting from STDIN.\nAborted.\n");
-                ret_value = EXIT_GENERIC_ERROR;
-                break;
-            }
-
-        case ACT_EXTRACT_FROM_LINE:
-            // stdin is a gzip file
-            if (index_filename_indicated == 1)
-            {
-                ret_value = action_create_index("", &index, index_filename,
-                                                EXTRACT_FROM_LINE, 0, extract_from_line, span_between_points,
-                                                end_on_first_proper_gzip_eof,
-                                                always_create_a_complete_index, WAITING_TIME,
-                                                wait_for_file_creation, extend_index_with_lines,
-                                                expected_first_byte, gzip_stream_may_be_damaged,
-                                                lazy_gzip_stream_patching_at_eof,
-                                                range_number_of_bytes, range_number_of_lines);
-                printToStderr("\n");
-                break;
-            }
-            else
-            {
-                printToStderr("ERROR: `-I INDEX` must be used when extracting from STDIN.\nAborted.\n");
-                ret_value = EXIT_GENERIC_ERROR;
-                break;
-            }
-
-        case ACT_CREATE_INDEX:
-            // stdin is a gzip file that must be indexed
-            if (index_filename_indicated == 1)
-            {
-                ret_value = action_create_index("", &index, index_filename,
-                                                JUST_CREATE_INDEX, 0, 0, span_between_points,
-                                                end_on_first_proper_gzip_eof,
-                                                always_create_a_complete_index, WAITING_TIME,
-                                                wait_for_file_creation, extend_index_with_lines,
-                                                expected_first_byte, gzip_stream_may_be_damaged,
-                                                lazy_gzip_stream_patching_at_eof,
-                                                range_number_of_bytes, range_number_of_lines);
-            }
-            else
-            {
-                ret_value = action_create_index("", &index, "",
-                                                JUST_CREATE_INDEX, 0, 0, span_between_points,
-                                                end_on_first_proper_gzip_eof,
-                                                always_create_a_complete_index, WAITING_TIME,
-                                                wait_for_file_creation, extend_index_with_lines,
-                                                expected_first_byte, gzip_stream_may_be_damaged,
-                                                lazy_gzip_stream_patching_at_eof,
-                                                range_number_of_bytes, range_number_of_lines);
-            }
-            printToStderr("\n");
-            break;
-
-        default:
-            printToStderr("ERROR: action not specified.\n");
+            printToStderr("ERROR: Could not delete '%s'.\nAborted.\n", index_filename);
             ret_value = EXIT_GENERIC_ERROR;
         }
     }
-    else
+
+    // check possible errors and `-e` before proceed
+    if (ret_value != EXIT_OK)
     {
-        file_name = argv[optind];
+        goto end_of_using_index;
+    }
 
-        ret_value = EXIT_OK;
-
-        // if no index filename is set (`-I`), it is derived from each <FILE> parameter
-        if (0 == index_filename_indicated)
-        {
-
-            if (NULL != index_filename)
-            {
-                free(index_filename);
-                index_filename = NULL;
-            }
-            index_filename = malloc(strlen(argv[i]) + 4 + 1);
-            sprintf(index_filename, "%s", argv[i]);
-
-            if (strlen(argv[i]) > 3 && // avoid out-of-bounds
-                (char *)strstr(index_filename, ".gz") ==
-                    (char *)(index_filename + strlen(argv[i]) - 3))
-                // if gzip-file name is 'FILE.gz', index file name will be 'FILE.gzi'
-                sprintf(index_filename, "%si", argv[i]);
-            else
-                // otherwise, the complete extension '.gzi' is appended
-                sprintf(index_filename, "%s.gzi", argv[i]);
-        }
-
-        // free previous loop's resources
-        if (NULL != in)
-        {
-            fclose(in);
-            in = NULL;
-        }
-        if (NULL != index)
-        {
-            free_index(index);
-            index = NULL;
-        }
-
-        if ((action == ACT_CREATE_INDEX ||
-                action == ACT_EXTRACT_FROM_BYTE || action == ACT_EXTRACT_FROM_LINE) &&
-            access(index_filename, F_OK) != -1)
-        {
-            // index file already exists
-
-            /*if ( ( extend_index_with_lines > 0 && action != ACT_EXTRACT_FROM_LINE ) &&
-                    ( force_action == 0 || ( force_action == 1 && write_index_to_disk == 0 ) ) )
-                    printToStderr("WARNING: `-[Xx]` will be ignored because index already exists.\n" );*/
-
-            // delete index file
-            printToStderr("Using `-f` force option: Deleting '%s' ...\n", index_filename);
-            if (remove(index_filename) != 0)
-            {
-                printToStderr("ERROR: Could not delete '%s'.\nAborted.\n", index_filename);
-                ret_value = EXIT_GENERIC_ERROR;
-            }
-        }
-
-        // check possible errors and `-e` before proceed
+    // create index first if `-F`
+    // (checking of conformity between `-F` and action has been done before)
+    if (force_strict_order == 1)
+    {
+        ret_value = action_create_index(file_name, &index, index_filename,
+                                        JUST_CREATE_INDEX, 0, 0, span_between_points,
+                                        end_on_first_proper_gzip_eof,
+                                        always_create_a_complete_index, WAITING_TIME,
+                                        wait_for_file_creation, extend_index_with_lines,
+                                        expected_first_byte, gzip_stream_may_be_damaged,
+                                        lazy_gzip_stream_patching_at_eof,
+                                        range_number_of_bytes, range_number_of_lines);
         if (ret_value != EXIT_OK)
         {
-            goto end_of_ifelse;
+            printToStderr("ERROR: Could not create index '%s'.\nAborted.\n", index_filename);
+            goto end_of_using_index;
         }
+    }
 
-        // create index first if `-F`
-        // (checking of conformity between `-F` and action has been done before)
-        if (force_strict_order == 1)
-        {
+    // "-bil" options can accept multiple files
+    switch (action)
+    {
+
+    case ACT_EXTRACT_FROM_BYTE:
+        ret_value = action_create_index(file_name, &index, index_filename,
+                                        EXTRACT_FROM_BYTE, extract_from_byte, 0, span_between_points,
+                                        end_on_first_proper_gzip_eof,
+                                        always_create_a_complete_index, WAITING_TIME,
+                                        wait_for_file_creation, extend_index_with_lines,
+                                        expected_first_byte, gzip_stream_may_be_damaged,
+                                        lazy_gzip_stream_patching_at_eof,
+                                        range_number_of_bytes, range_number_of_lines);
+        break;
+
+    case ACT_EXTRACT_FROM_LINE:
+        ret_value = action_create_index(file_name, &index, index_filename,
+                                        EXTRACT_FROM_LINE, 0, extract_from_line, span_between_points,
+                                        end_on_first_proper_gzip_eof,
+                                        always_create_a_complete_index, WAITING_TIME,
+                                        wait_for_file_creation, extend_index_with_lines,
+                                        expected_first_byte, gzip_stream_may_be_damaged,
+                                        lazy_gzip_stream_patching_at_eof,
+                                        range_number_of_bytes, range_number_of_lines);
+        break;
+
+    case ACT_CREATE_INDEX:
+        if (force_strict_order == 0)
+            // if force_strict_order == 1 action has already been done!
             ret_value = action_create_index(file_name, &index, index_filename,
                                             JUST_CREATE_INDEX, 0, 0, span_between_points,
                                             end_on_first_proper_gzip_eof,
@@ -5001,67 +4898,22 @@ int main(int argc, char **argv)
                                             expected_first_byte, gzip_stream_may_be_damaged,
                                             lazy_gzip_stream_patching_at_eof,
                                             range_number_of_bytes, range_number_of_lines);
-            if (ret_value != EXIT_OK)
-            {
-                printToStderr("ERROR: Could not create index '%s'.\nAborted.\n", index_filename);
-                goto end_of_ifelse; // breaks for() loop
-            }
-        }
+        break;
 
-        // "-bil" options can accept multiple files
-        switch (action)
-        {
-
-        case ACT_EXTRACT_FROM_BYTE:
-            ret_value = action_create_index(file_name, &index, index_filename,
-                                            EXTRACT_FROM_BYTE, extract_from_byte, 0, span_between_points,
-                                            end_on_first_proper_gzip_eof,
-                                            always_create_a_complete_index, WAITING_TIME,
-                                            wait_for_file_creation, extend_index_with_lines,
-                                            expected_first_byte, gzip_stream_may_be_damaged,
-                                            lazy_gzip_stream_patching_at_eof,
-                                            range_number_of_bytes, range_number_of_lines);
-            break;
-
-        case ACT_EXTRACT_FROM_LINE:
-            ret_value = action_create_index(file_name, &index, index_filename,
-                                            EXTRACT_FROM_LINE, 0, extract_from_line, span_between_points,
-                                            end_on_first_proper_gzip_eof,
-                                            always_create_a_complete_index, WAITING_TIME,
-                                            wait_for_file_creation, extend_index_with_lines,
-                                            expected_first_byte, gzip_stream_may_be_damaged,
-                                            lazy_gzip_stream_patching_at_eof,
-                                            range_number_of_bytes, range_number_of_lines);
-            break;
-
-        case ACT_CREATE_INDEX:
-            if (force_strict_order == 0)
-                // if force_strict_order == 1 action has already been done!
-                ret_value = action_create_index(file_name, &index, index_filename,
-                                                JUST_CREATE_INDEX, 0, 0, span_between_points,
-                                                end_on_first_proper_gzip_eof,
-                                                always_create_a_complete_index, WAITING_TIME,
-                                                wait_for_file_creation, extend_index_with_lines,
-                                                expected_first_byte, gzip_stream_may_be_damaged,
-                                                lazy_gzip_stream_patching_at_eof,
-                                                range_number_of_bytes, range_number_of_lines);
-            break;
-
-        default:
-            printToStderr("ERROR: action not specified.\n");
-            ret_value = EXIT_GENERIC_ERROR;
-        }
-
-        if (ret_value != EXIT_OK)
-        {
-            printToStderr("Aborted.\n");
-            // break the for loop
-            printToStderr("file processed with errors!\n");
-            printToStderr("\n");
-        }
-
-end_of_ifelse:
+    default:
+        printToStderr("ERROR: action not specified.\n");
+        ret_value = EXIT_GENERIC_ERROR;
     }
+
+    if (ret_value != EXIT_OK)
+    {
+        printToStderr("Aborted.\n");
+        // break the for loop
+        printToStderr("file processed with errors!\n");
+        printToStderr("\n");
+    }
+
+end_of_using_index:
 
     // final freeing of resources
     if (NULL != in)
