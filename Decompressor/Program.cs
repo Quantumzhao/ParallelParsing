@@ -8,6 +8,8 @@ using System.Text;
 // https://trace.ncbi.nlm.nih.gov/Traces/?view=run_browser&acc=SRR11192680
 // https://trace.ncbi.nlm.nih.gov/Traces/?view=run_browser&acc=SRR21524988 
 
+namespace ParallelParsing;
+
 public class GzipDecompressor
 {
     public static int readByteSize = 64;
