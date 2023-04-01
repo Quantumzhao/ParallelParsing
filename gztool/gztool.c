@@ -1057,15 +1057,13 @@ ssize_t PREAD(
 //              GZIP_MARK_ERROR, GZIP_MARK_NONE, GZIP_MARK_BEGINNING, GZIP_MARK_FULL_FLUSH.
 //      .value: gzip stream byte position of a feasible restart gzip-point.
 local struct returned_output decompress_in_advance(
-    const z_streamp strm_original, FILE *file_in, const char *file_name,
+    FILE *file_in, 
     const uint64_t totin0,
     const int chunks_in_advance0,
     const int chunks_to_look_backwards0,
     const enum INDEX_AND_EXTRACTION_OPTIONS indx_n_extraction_opts0,
     const int decompressing_with_gzip_headers0,
     const int end_on_first_proper_gzip_eof0,
-    const uint64_t output_data_counter,
-    const uint64_t totout,
     const int waiting_time0,
     const bool lazy_gzip_stream_patching_at_eof0,
     const uint64_t expected_first_byte0,
@@ -1118,50 +1116,38 @@ local struct returned_output decompress_in_advance(
     // As there may be errors in the middle of the process, the only
     // way to guarantee this is to explicitly reset this function prior to each processing,
     // via decompress_in_advance( ...,     DECOMPRESS_IN_ADVANCE_*RESET ) from decompress_and_build_index()
-    if (DECOMPRESS_IN_ADVANCE_RESET == initialize_function ||
-        DECOMPRESS_IN_ADVANCE_SOFT_RESET == initialize_function)
+    if (true == strm_initialized)
     {
-        if (true == strm_initialized)
-        {
-            inflateEnd(&strm);
-            // ( input[] and window[] must not be emptied
-            //   as they're filled on (next) first call. )
-        }
-        strm_initialized = false;
-        indx_n_extraction_opts = indx_n_extraction_opts0;
-        totin = totin0;
-        last_processed_byte = totin0;
-        // ret.value = 0LLU; // ret.value is never used:
-        ret.error = Z_OK; // ret.error is used, to maintain this code as an-almost-clone of decompress_and_build_index()
-                          // thanks to using the same name.
-        chunks_in_advance = chunks_in_advance0;
-        chunks_to_look_backwards = chunks_to_look_backwards0;
-        decompressing_with_gzip_headers = decompressing_with_gzip_headers0;
-        end_on_first_proper_gzip_eof = end_on_first_proper_gzip_eof0;
-        expected_first_byte = expected_first_byte0;
-        first_call = true;
-        if (DECOMPRESS_IN_ADVANCE_RESET == initialize_function)
-        {
-            waiting_time = waiting_time0;
-            lazy_gzip_stream_patching_at_eof = lazy_gzip_stream_patching_at_eof0;
-            last_correct_reentry_point_returned = 0LLU;
-        }
-        if (chunks_in_advance0 == 0 ||
-            chunks_to_look_backwards0 == 0)
-        {
-            // these two values cannot be zero!
-            returned_value.error = GZIP_MARK_FATAL_ERROR;
-        }
-        return returned_value;
+        inflateEnd(&strm);
+        // ( input[] and window[] must not be emptied
+        //   as they're filled on (next) first call. )
     }
-    else
+    strm_initialized = false;
+    indx_n_extraction_opts = indx_n_extraction_opts0;
+    totin = totin0;
+    last_processed_byte = totin0;
+    // ret.value = 0LLU; // ret.value is never used:
+    ret.error = Z_OK; // ret.error is used, to maintain this code as an-almost-clone of decompress_and_build_index()
+                        // thanks to using the same name.
+    chunks_in_advance = chunks_in_advance0;
+    chunks_to_look_backwards = chunks_to_look_backwards0;
+    decompressing_with_gzip_headers = decompressing_with_gzip_headers0;
+    end_on_first_proper_gzip_eof = end_on_first_proper_gzip_eof0;
+    expected_first_byte = expected_first_byte0;
+    first_call = true;
+    if (DECOMPRESS_IN_ADVANCE_RESET == initialize_function)
     {
-        // This value tells us how far behind we can go without compromising
-        // already extracted (and so, already considered "good") data.
-        // It is informative, so it's not (actually) used as a non-trespass barrier.
-        caller_last_processed_byte = totin0;
-        // note that in general: totin0 <= ftello(file_in)
+        waiting_time = waiting_time0;
+        lazy_gzip_stream_patching_at_eof = lazy_gzip_stream_patching_at_eof0;
+        last_correct_reentry_point_returned = 0LLU;
     }
+    if (chunks_in_advance0 == 0 ||
+        chunks_to_look_backwards0 == 0)
+    {
+        // these two values cannot be zero!
+        returned_value.error = GZIP_MARK_FATAL_ERROR;
+    }
+    return returned_value;
 
     // If this function found a licit EOF on a previous call,
     // then no more decompress_in_advance() processing is needed:
@@ -1189,27 +1175,9 @@ local struct returned_output decompress_in_advance(
     if (false == strm_initialized)
     {
         // deep copy:
-        if (Z_OK != inflateCopy((z_streamp)&strm, strm_original))
-        {
-            returned_value.value = 0LLU;
-            returned_value.error = GZIP_MARK_ERROR;
-            return returned_value;
-        }
-        // now copy original buffers to local ones:
-        // It is not possible to copy all *input data only knowing
-        // strm.next_in and strm.avail_in, because there exists the special
-        // case of strm.avail_in<CHUNK when feof() and then strm.next_in == input
-        // whilst otherwise strm_next_in - CHUNK + strm.avail_in == input.
-        // Even if this is possible knowing feof(file_in), it is not needed
-        // to copy all original input buffer: just the strm.avail_in # bytes suffice.
-        // For input data: copy necessary bytes to local input with .next_in help
-        memcpy(input, strm.next_in, strm.avail_in);
-        strm.next_in = input;
-        // For output data: copy it all to local window with .next_out help
-        memcpy(window, strm.next_out - WINSIZE + strm.avail_out, WINSIZE);
-        strm.next_out = window + WINSIZE - strm.avail_out;
-        // at this point, decompress_in_advance() has been correctly initialized:
-        strm_initialized = true;
+        returned_value.value = 0LLU;
+        returned_value.error = GZIP_MARK_ERROR;
+        return returned_value;
     }
 
     // Note that all code from here on, which is not involved in the
@@ -1293,30 +1261,7 @@ local struct returned_output decompress_in_advance(
                 strm.avail_in += strm_avail_in0;
             }
         }
-        if (feof(file_in))
-        {
-            // generic check for growing files (not related to bgzip-compatible-streams code):
-            // check that file hasn't shrunk, what would mean that the file
-            // has been overwritten from the beginning (possible with rsyslog logs, for example)
-            if (strlen(file_name) > 0 &&    // this check cannot be done on STDIN
-                expected_first_byte <= 1LLU // this check must not be done if using `-n` (because then st.st_size < totin in general)
-            )
-            {
-                struct stat st;
-                stat(file_name, &st);
-                if ((uint64_t)(st.st_size + GZIP_HEADER_SIZE_BY_ZLIB) < totin)
-                {
-                    // file has shrunk! so do a correct finish of the action_create_index (whatever it is)
-                    // (Note that it is not possible that this condition arises when accessing a truncated gzip
-                    // file with its corresponding (not-truncated) complete index file, because in this case
-                    // fseeko() previously failed. Also if gzip-file size is 0 (which is possible and allowed)
-                    // this condition won't arise because (10 < 0) is false (index doesn't exist) and
-                    // (10 < 10) is false (index contains always the first access point))
-                    printToStderr("\nPATCHING: Detected '%s' gzip file overwriting, so ending patching process\n", file_name);
-                    break;
-                }
-            }
-        }
+
         // .................................................
         //      It is not necessary to reinitiate decompress_in_advance() after Z_STREAM_END
         //      in case of returned_value.error == GZIP_MARK_ERROR && returned_value.value > 0
@@ -1752,31 +1697,20 @@ decompress_in_advance_ret:
          returned_value.error == GZIP_MARK_FULL_FLUSH) &&
         returned_value.value < caller_last_processed_byte)
     {
-        if (output_data_counter > 0LLU)
+        // if caller has not yet extracted data, the warning is to indicate
+        // that the point of extraction will be BEFORE indicated `-[bL]` value:
+        if (JUST_CREATE_INDEX != indx_n_extraction_opts &&
+            COMPRESS_AND_CREATE_INDEX != indx_n_extraction_opts)
         {
             printToStderr("PATCHING WARNING:\n"
-                          "    Part of data extracted after (compressed %llu / uncompressed %llu) Byte\n"
-                          "    overlaps with previously extracted data, after a badly-ended gzip stream\n"
-                          "    was found @%llu and a new starting point began @%llu.\n",
-                          caller_last_processed_byte, totout, totin, returned_value.value);
+                            "    Beginning of extracted data will begin BEFORE indicated\n"
+                            "    `-[bL]` value, due to an unfinished gzip-erroneous-stream.\n");
         }
         else
         {
-            // if caller has not yet extracted data, the warning is to indicate
-            // that the point of extraction will be BEFORE indicated `-[bL]` value:
-            if (JUST_CREATE_INDEX != indx_n_extraction_opts &&
-                COMPRESS_AND_CREATE_INDEX != indx_n_extraction_opts)
-            {
-                printToStderr("PATCHING WARNING:\n"
-                              "    Beginning of extracted data will begin BEFORE indicated\n"
-                              "    `-[bL]` value, due to an unfinished gzip-erroneous-stream.\n");
-            }
-            else
-            {
-                // unless there was nothing to extract!
-                printToStderr("PATCHING WARNING:\n"
-                              "    Data extracted around the patching point may overlap.\n");
-            }
+            // unless there was nothing to extract!
+            printToStderr("PATCHING WARNING:\n"
+                            "    Data extracted around the patching point may overlap.\n");
         }
     }
 
@@ -2379,12 +2313,11 @@ local struct returned_output decompress_and_build_index(
     // initialize decompress_in_advance() internal (static) processing variables:
     if (gzip_stream_may_be_damaged > 0)
     {
-        decompress_in_advance(NULL, NULL, NULL,
+        decompress_in_advance(NULL, 
                               totin, CHUNKS_TO_DECOMPRESS_IN_ADVANCE, CHUNKS_TO_LOOK_BACKWARDS,
                               indx_n_extraction_opts,
                               decompressing_with_gzip_headers,
                               end_on_first_proper_gzip_eof,
-                              0LLU, 0LLU,
                               waiting_time,
                               lazy_gzip_stream_patching_at_eof,
                               expected_first_byte,
@@ -2498,50 +2431,11 @@ local struct returned_output decompress_and_build_index(
             decompress_until_this_point_byte == 0LLU)
         {
             struct returned_output ret;
-            ret = decompress_in_advance((z_streamp)&strm, file_in, file_name, totin, 0, 0, 0, 0, 0,
-                                        output_data_counter, totout, 0, false, 0LLU,
-                                        DECOMPRESS_IN_ADVANCE_CONTINUE);
-            switch (ret.error)
-            {
-            case GZIP_MARK_NONE:
-                // no error was found in advance: proceed as usual
-                break;
-            case GZIP_MARK_ERROR:
-                // and unrecoverable gzip error was found or
-                // a processing error raised which makes recovery impossible:
-                // progress as usual, as nothing more can be done.
-                printToStderr("PATCHING: GZIP errors cannot be fixed.\n");
-                // set these values to avoid entering this loop again:
-                decompress_until_this_point_byte = ret.value;
-                decompress_until_this_point_type = ret.error;
-                // (optionally) free strm structure from internal state of decompress_in_advance()
-                // as it won't be called again because an error will rise eventually on caller:
-                decompress_in_advance(NULL, NULL, NULL,
-                                      0LLU, CHUNKS_TO_DECOMPRESS_IN_ADVANCE, CHUNKS_TO_LOOK_BACKWARDS,
-                                      0, 0, 0, 0LLU, 0LLU, 0, false, 0LLU, DECOMPRESS_IN_ADVANCE_RESET); // returned value is always ok when called with this value
-                break;
-            case GZIP_MARK_FATAL_ERROR:
-                // an internal and compulsory fseeko() failed, so process
-                // MUST stop here, as read won't be correct at this ftello(file_in):
-                printToStderr("PATCHING ERROR: Fatal Read error of input file obliges to stop process.\n");
-                ret.error = Z_DATA_ERROR;
-                goto decompress_and_build_index_error;
-            case GZIP_MARK_FULL_FLUSH:
-                printToStderr("PATCHING: New valid gzip full flush found @ %llu Byte.\n", ret.value);
-                // a new GZIP-stream beginning mark was found:
-                decompress_until_this_point_byte = ret.value;
-                decompress_until_this_point_type = ret.error;
-                break;
-            case GZIP_MARK_BEGINNING:
-                if (GZIP_MARK_BEGINNING == ret.error)
-                {
-                    printToStderr("PATCHING: New valid gzip stream beginning found @ %llu Byte.\n", ret.value);
-                }
-                // a new GZIP-stream beginning mark was found:
-                decompress_until_this_point_byte = ret.value;
-                decompress_until_this_point_type = ret.error;
-                break;
-            }
+            // an internal and compulsory fseeko() failed, so process
+            // MUST stop here, as read won't be correct at this ftello(file_in):
+            printToStderr("PATCHING ERROR: Fatal Read error of input file obliges to stop process.\n");
+            ret.error = Z_DATA_ERROR;
+            goto decompress_and_build_index_error;
         }
 
         /* process all of strm.next_in (size strm.avail_in), or until end of stream */
@@ -2934,12 +2828,11 @@ local struct returned_output decompress_and_build_index(
                 //
                 // and reset decompress_in_advance() internal state
                 //
-                decompress_in_advance(NULL, NULL, NULL,
+                decompress_in_advance(NULL, 
                                       totin, CHUNKS_TO_DECOMPRESS_IN_ADVANCE, CHUNKS_TO_LOOK_BACKWARDS,
                                       indx_n_extraction_opts,
                                       decompressing_with_gzip_headers,
                                       end_on_first_proper_gzip_eof,
-                                      0LLU, 0LLU,
                                       0,
                                       false,
                                       0LLU,
@@ -3077,10 +2970,6 @@ local struct returned_output decompress_and_build_index(
         }
     }
 
-    // free strm structure from internal state of decompress_in_advance():
-    decompress_in_advance(NULL, NULL, NULL,
-                          0LLU, 0, 0, 0, 0, 0, 0LLU, 0LLU, 0, false, 0LLU, DECOMPRESS_IN_ADVANCE_RESET); // returned value is always ok when called with this value
-
     *built = index;
     if (NULL != index)
     {
@@ -3097,10 +2986,6 @@ local struct returned_output decompress_and_build_index(
      * or point of exit when end_processing_because_of_range == true
      */
 decompress_and_build_index_error:
-
-    // free strm structure from internal state of decompress_in_advance():
-    decompress_in_advance(NULL, NULL, NULL,
-                          0LLU, 0, 0, 0, 0, 0, 0LLU, 0LLU, 0, false, 0LLU, DECOMPRESS_IN_ADVANCE_RESET); // returned value is always ok when called with this value
 
     // print output_data_counter info
     if (output_data_counter > 0)
