@@ -15,22 +15,34 @@ public record class Point(
 	// size of (compressed) window
 	uint WindowSize,
 	// preceding 32K of uncompressed data, compressed
-	SChar[] Window,
+	char[] Window,
 	ulong lineNumber
 );
 
-// public class Index
-// {
-// 	public ulong FileSize;
-// 	public List<Point> List;
-// 	public string? FileName;
-// 	public bool IsIndexComplete;
+public class Index
+{
+	public ulong FileSize;
+	public FixedArray<Point> List;
+	public string FileName;
+	public bool IsIndexComplete;
+	public int IndexVersion;
+	public uint LineNumberFormat;
+	public ulong NumberOfLines;
+
+	public static unsafe implicit operator Index(access* ptr)
+	{
+		return new Index {
+			FileSize = ptr->file_size,
+			List = 
+		};
+	}
+}
 // 	/* index_version should be 0 (default), thus omitted */
 // 	/* line_number_format should be irrelevant if index contains no info about line number */
 // 	/* number_of_lines omitted, for the same reason */
 
 // 	public Index AddPoint(uint bits, ulong input, ulong output, uint left, 
-// 		ref SChar window, uint windowSize, ulong lineNumber, bool isCompressedWindow)
+// 		char[] window, uint windowSize, ulong lineNumber, bool isCompressedWindow)
 // 	{
 // 		// Point next;
 // 		// ulong size = windowSize;
@@ -63,25 +75,24 @@ public record class Point(
 // 		FileName = null;
 // 	}
 
-// 	// private unsafe SChar[]? CompressChunk(ref SChar source, ref ulong size, int level)
+// 	// private unsafe char[]? CompressChunk(char[] source, ulong inputSize, int level)
 // 	// {
 // 	// 	ZSignal flush;
 // 	// 	ZResult ret;
 // 	// 	uint have;
 // 	// 	ulong i = 0;
 // 	// 	ulong outputSize = 0;
-// 	// 	ulong inputSize = size;
-// 	// 	SChar[] input, output, outComplete;
+// 	// 	FixedArray<char> input, output, outComplete;
 
 // 	// 	if (Defined.DeflateInit(out var strm, level) is not ZResult.OK) return null;
 
-// 	// 	input = new SChar[Constants.CHUNK];
-// 	// 	output = new SChar[Constants.CHUNK];
-// 	// 	outComplete = new SChar[Constants.CHUNK];
+// 	// 	input = new FixedArray<char>(Constants.CHUNK);
+// 	// 	output = new FixedArray<char>(Constants.CHUNK);
+// 	// 	outComplete = new FixedArray<char>(Constants.CHUNK);
 
 // 	// 	do
 // 	// 	{
-// 	// 		strm.Value.avail_in = (uint)(i + Constants.CHUNK < inputSize ? 
+// 	// 		strm = (uint)(i + Constants.CHUNK < inputSize ? 
 // 	// 									Constants.CHUNK : 
 // 	// 									inputSize - i);
 
@@ -161,6 +172,14 @@ public enum ZSignal
 	FINISH,
 	BLOCK,
 	TREES
+}
+
+public enum EXIT_RETURNED_VALUES
+{
+	OK = 0,
+	GENERIC_ERROR = 1,
+	INVALID_OPTION = 2,
+	FILE_OVERWRITTEN = 100
 }
 
 public static class Constants
