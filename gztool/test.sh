@@ -43,4 +43,4 @@ fi
 # ----------- DECOMPRESSION W/ STARTING POS -------------
 # set the position to 400
 
-`./gztool -b 400 -I ./tests/gplv3.txt.gzi ./tests/gplv3.txt.gz > test_400.txt`
+`./gztool -b 400  -I ./tests/gplv3.txt.gzi ./tests/gplv3.txt.gz > test_400.txt`

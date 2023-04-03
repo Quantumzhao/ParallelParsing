@@ -4,7 +4,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace ParallelParsing.GZTool;
+namespace ParallelParsing.GZTool.NET;
 
 public static class ExternalCalls
 {
@@ -90,31 +90,6 @@ public static class ExternalCalls
 	);
 }
 
-public unsafe struct point
-{
-	UInt64 @out;
-	UInt64 @in;
-	UInt32 bits;
-	UInt64 window_beginning;
-	UInt32 window_size;
-	Byte* window;
-	UInt64 line_number;
-}
-
-
-public unsafe struct access
-{
-	public UInt64 have;
-	public UInt64 size;
-	public UInt64 file_size;
-	public point* list;
-	[MarshalAs(UnmanagedType.LPStr)]
-	public char* file_name;
-	public int index_complete;
-	public int index_version;
-	public UInt32 line_number_format;
-	public UInt64 number_of_lines;
-}
 
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct z_stream

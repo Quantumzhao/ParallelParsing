@@ -1173,7 +1173,6 @@ bool limitBufferOutput(
 //                                    (to be used when the file contains surely only one gzip stream)
 // int always_create_a_complete_index : create a 'complete' index file even in case of decompressing errors.
 //                                      Also an index pointer (**built) is returned, instead of NULL.
-// int waiting_time             : waiting time in seconds between reads when `-[ST]` (always >0)
 // int extend_index_with_lines  : 0: create index without line numbers (v0 index)
 //                                1: create index WITH line numbers (v1 index) using Unix format (\n)
 //                                2: create index WITH line numbers (v1 index) using old Mac format (\r) (compatible with Windows \n\r)
@@ -2655,7 +2654,6 @@ decompress_file_error:
 //                                   (to be used when the file contains surely only one gzip stream)
 // int always_create_a_complete_index : create a 'complete' index file even in case of decompressing errors.
 //                                      Also an index pointer (**built) is returned, instead of NULL.
-// int waiting_time             : waiting time in seconds between reads when `-[ST]`
 // int force_action             : with `-[cd]`, force destination file overwriting if it exists
 // int wait_for_file_creation   : 0: exit with error if source file doesn't exist
 //                                1: wait for file creation if it doesn't yet exist, when using `-[STcd]`
@@ -3390,13 +3388,13 @@ int main(int argc, char **argv)
         }
     }
 
-    if (1 == force_strict_order)
+    if (force_strict_order)
     {
         printToStderr("ERROR: Cannot use `-F` with `-[dlSTu]`.\n");
         return EXIT_INVALID_OPTION;
     }
 
-    if (true == lazy_gzip_stream_patching_at_eof)
+    if (lazy_gzip_stream_patching_at_eof)
     {
         printToStderr("ERROR: without `-[ST]`, use `-p` instead of `-P`.\n");
         return EXIT_INVALID_OPTION;
