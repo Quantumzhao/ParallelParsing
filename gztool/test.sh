@@ -3,6 +3,8 @@ if [ `bash ./compile.sh` ]; then
 	exit 1;
 fi
 
+rm "./tests/gplv3.txt.gzi"
+
 # ---------- INDEX CREATION -------------
 
 OUTPUT_FILE=./tests/gplv3.txt.gzi
@@ -14,7 +16,6 @@ CKSUM0=`md5sum "./tests/gplv3.txt.gzi.ORIG" | awk '{print $1;}'`
 CKSUM1=`md5sum "./tests/gplv3.txt.gzi" | awk '{print $1;}'`
 
 if [ "$CKSUM0" = "$CKSUM1" ]; then
-	rm "./tests/gplv3.txt.gzi"
 	echo "Indexes check: PASS"
 else
 	echo $CKSUM0 != $CKSUM1;

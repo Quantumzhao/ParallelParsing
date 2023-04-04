@@ -170,7 +170,6 @@
 //    fields.
 // default waiting time in seconds when supervising a growing gzip file:
 #define WAITING_TIME 4
-
 // how many CHUNKs will be decompressed in advance if it is needed (parameter gzip_stream_may_be_damaged, `-p`)
 #define CHUNKS_TO_DECOMPRESS_IN_ADVANCE 3
 // how many CHUNKs will be look to backwards for a new good gzip reentry point after an error is found (with `-p`)
@@ -231,6 +230,7 @@ enum INDEX_AND_EXTRACTION_OPTIONS
 {
     JUST_CREATE_INDEX = 1,
     EXTRACT_FROM_BYTE,
+    COMPRESS_AND_CREATE_INDEX,
     EXTRACT_FROM_LINE
 };
 
@@ -242,6 +242,10 @@ enum ACTION
     ACT_EXTRACT_FROM_LINE
 };
 
+// enum VERBOSITY_LEVEL { VERBOSITY_NONE = 0, VERBOSITY_NORMAL = 1, VERBOSITY_EXCESSIVE = 2,
+//                        VERBOSITY_MANIAC = 3, VERBOSITY_CRAZY = 4, VERBOSITY_NUTS = 5 };
+
+// enum VERBOSITY_LEVEL verbosity_level = VERBOSITY_NORMAL;
 
 // values returned by decompress_in_advance() in ret.error value:
 enum GZIP_MARK_FOUND_TYPE
@@ -273,6 +277,7 @@ enum DECOMPRESS_IN_ADVANCE_INITIALIZERS
 #define MAX_giveMeSIUnits_RETURNED_LENGTH 14
 char number_output[MAX_giveMeSIUnits_RETURNED_LENGTH];
 
+// `fprintf` substitute for printing with VERBOSITY_LEVEL
 void printToStderr(const char *format, ...)
 {
 
@@ -1169,10 +1174,18 @@ bool limitBufferOutput(
 //                               0 otherwise.
 // char *index_filename   : index will be read/written on-the-fly
 //                                    to this index file name.
+// int write_index_to_disk  : 1: will write/update the index as usual;
+//                            0: will just read, but do not write nor update (overwrite) the index on disk,
+//                           and also, do not create/update the index in memory (**built and returned_output.value):
+//                           This is done because if index is not written to disk, windows would need to be
+//                           maintained in memory, increasing the memory footprint unnecessarily as the index
+//                           is not (actually) used later in the app. (Windows could be also emptied, but again,
+//                           index points are not used later.)
 // int end_on_first_proper_gzip_eof : end file processing on first proper (at feof()) GZIP EOF
 //                                    (to be used when the file contains surely only one gzip stream)
 // int always_create_a_complete_index : create a 'complete' index file even in case of decompressing errors.
 //                                      Also an index pointer (**built) is returned, instead of NULL.
+// int waiting_time             : waiting time in seconds between reads when `-[ST]` (always >0)
 // int extend_index_with_lines  : 0: create index without line numbers (v0 index)
 //                                1: create index WITH line numbers (v1 index) using Unix format (\n)
 //                                2: create index WITH line numbers (v1 index) using old Mac format (\r) (compatible with Windows \n\r)
@@ -1200,7 +1213,7 @@ local struct returned_output decompress_and_build_index(
     enum INDEX_AND_EXTRACTION_OPTIONS indx_n_extraction_opts, uint64_t offset, uint64_t line_number_offset,
     char *index_filename,
     int end_on_first_proper_gzip_eof, int always_create_a_complete_index,
-    int extend_index_with_lines, uint64_t expected_first_byte,
+    int waiting_time, int extend_index_with_lines, uint64_t expected_first_byte,
     int gzip_stream_may_be_damaged, bool lazy_gzip_stream_patching_at_eof,
     uint64_t range_number_of_bytes, uint64_t range_number_of_lines)
 {
@@ -2630,6 +2643,408 @@ decompress_file_error:
     return ret;
 }
 
+// GZIP compress the file_in stream to file_out
+// creating a .gzi index to index_filename file name,
+// and returning it on *built.
+// Note that the index will be of minimum size as this function
+// creates Z_FULL_FLUSH marks on compression stream every span bytes,
+// so the window size will be always 0 bytes. This produces indexes
+// almost as small as with bgzip compression, with better compression factor.
+// Compression based on def() from zlib/examples/zpipe.c by Mark Adler
+/* Compress from file source to file dest until EOF on source.
+   def() returns Z_OK on success, Z_MEM_ERROR if memory could not be
+   allocated for processing, Z_STREAM_ERROR if an invalid compression
+   level is supplied, Z_VERSION_ERROR if the version of zlib.h and the
+   version of the library linked do not match, or Z_ERRNO if there is
+   an error reading or writing the files. */
+// INPUT:
+// FILE *file_in : source stream
+// FILE *file_out   : destination stream
+// int level    : level of compression
+// char *file_name : name of the input file associated with FILE *in.
+//                            Can be "" (no file name: stdin used), but not NULL.
+//                            Used only if input (FILE *in)
+//                            is associated with a file (not stdin) to detect a
+//                            possible overwriting of the source file (and then stop).
+// uint64_t span    : span
+// struct access **built: address of index pointer, equivalent to passed by reference.
+//                        Note that *built == NULL on call ALWAYS, because index is
+//                        constructed from scratch here.
+// char *index_filename  : index will be read/written on-the-fly
+//                                  to this index file name.
+// int write_index_to_disk  : 1: will write/update the index as usual;
+//                            0: do not write the index on disk,
+//                           and also, do not create/update the index in memory (**built and returned_output.value):
+//                           This is done because if index is not written to disk, windows would need to be
+//                           maintained in memory, increasing the memory footprint unnecessarily as the index
+//                           is not (actually) used later in the app. (Windows could be also emptied, but again,
+//                           index points are not used later.)
+// int end_on_first_eof : end file processing on first feof():
+//                        to be used when we are not compressing a growing file.
+// int always_create_a_complete_index : create a 'complete' index file even in case of compressing errors.
+//                                      Also an index pointer (**built) is returned, instead of NULL.
+// int waiting_time     : waiting time in seconds between reads when `-[S]`
+// int extend_index_with_lines  : 0: create index without line numbers (v0 index)
+//                                1: create index WITH line numbers (v1 index) using Unix format (\n)
+//                                2: create index WITH line numbers (v1 index) using old Mac format (\r) (compatible with Windows \n\r)
+// OUTPUT:
+// struct returned_output: contains two values:
+//      .error: Z_* error code or Z_OK if everything was ok
+//      .value: size of built index (index->have)
+local struct returned_output compress_and_build_index(
+    FILE *file_in, FILE *file_out, char *file_name, uint64_t span,
+    struct access **built, char *index_filename,
+    int end_on_first_eof, int always_create_a_complete_index,
+    int waiting_time, int extend_index_with_lines)
+{
+    struct returned_output ret;
+    uint64_t last = 0;            /* uncompressed byte position of last access point */
+    struct access *index = NULL;  /* access points being generated */
+    uint64_t totin = 0;           // counts uncompressed bytes read from file_in
+    uint64_t totout = 0;          // counts compressed bytes deflated to file_out
+    uint64_t totlines = 1;        // counts total line numbers in file_in
+    int there_are_more_chars = 0; // totlines may need to be decremented at the end depending on last stream char
+    int flush = Z_NO_FLUSH;
+    unsigned have;
+    z_stream strm;
+    FILE *index_file = NULL;
+    size_t index_last_written_point = 0;
+    unsigned char *input;
+    unsigned char *output;
+
+    ret.value = 0;
+    ret.error = Z_OK;
+
+    /* allocate deflate state */
+    strm.zalloc = Z_NULL;
+    strm.zfree = Z_NULL;
+    strm.opaque = Z_NULL;
+    ret.error = deflateInit2( // www.zlib.net/manual.html
+                              // github.com/madler/zlib/blob/master/zlib.h
+                              //  Add 16 to windowBits to write a simple gzip header and trailer
+                              //  around the compressed data instead of a zlib wrapper
+        &strm, 0, Z_DEFLATED, 15 + 16,
+        8, Z_DEFAULT_STRATEGY);
+    if (ret.error != Z_OK)
+        return ret;
+
+    input = malloc(CHUNK);
+    output = malloc(CHUNK);
+
+    if (extend_index_with_lines > 0)
+    {
+        // mark index as index_version = 1 to store line numbers when serialize();
+        // in order to do this, index must be created now (empty)
+        index = create_empty_index();
+        if (index == NULL)
+        { // Oops!?
+            ret.error = Z_MEM_ERROR;
+            return ret;
+        }
+        index->index_version = 1;
+        if (extend_index_with_lines == 2)
+            index->line_number_format = 1;
+        else
+            index->line_number_format = 0;
+    }
+
+    /* open index_filename for binary writing */
+    // index_filename DOES NOT previously exists: this has has been checked on caller
+    if (strlen(index_filename) > 0)
+    {
+        if (access(index_filename, F_OK) != -1)
+        {
+            // index_filename already exist:
+            // Abort, as we would overwrite it:
+            printToStderr("Index file '%s' already exist. Aborted.\n", index_filename);
+            goto compress_and_build_index_error;
+        }
+        else
+        {
+            // index_filename does not exist:
+            index_file = fopen(index_filename, "w+b");
+        }
+    }
+    else
+    {
+        SET_BINARY_MODE(STDOUT); // sets binary mode for stdout in Windows
+        index_file = stdout;
+    }
+    if (NULL == index_file)
+    {
+        printToStderr("Could not write index to file '%s'.\n", index_filename);
+        goto compress_and_build_index_error;
+    }
+
+    /* compress until end of file */
+    do
+    {
+
+        // check if a new index point must be created
+        if ( // create an index point at uncompressed byte 0 (just before data)
+            (totin == 0 &&
+             index_last_written_point == 0) ||
+            // create index points after Z_FULL_FLUSH marks on compressed data
+            (totin - last >= span &&
+             Z_FULL_FLUSH == flush))
+        {
+
+            // write index point
+            index = addpoint(index, 0,
+                                ((0 == totout) ? GZIP_HEADER_SIZE_BY_ZLIB : totout), // compressed byte after header <=> uncompressed byte 0
+                                totin, 0, NULL, 0, totlines, 0);
+
+            // write added point!
+            // note that points written are automatically emptied of its window values
+            // in order to use as less memory a s possible
+            if (!serialize_index_to_file(index_file, index, index_last_written_point))
+                goto compress_and_build_index_error;
+            }
+
+            if (NULL != index)
+                index_last_written_point = index->have;
+
+            last = totin;
+
+        strm.avail_in = fread(input, 1, CHUNK, file_in);
+        totin += strm.avail_in;
+        // count lines in this source chunk
+        if (extend_index_with_lines > 0)
+        {
+            totlines += giveMeNumberOfLinesInChars(
+                input, strm.avail_in,
+                0, extend_index_with_lines - 1,
+                &there_are_more_chars);
+        }
+
+        if (ferror(file_in))
+        {
+            (void)deflateEnd(&strm);
+            goto compress_and_build_index_error;
+        }
+
+        if (feof(file_in))
+        {
+            if (end_on_first_eof == 1)
+                flush = Z_FINISH;
+            else
+                flush = Z_SYNC_FLUSH; // Z_SYNC_FLUSH doesn't occupy space
+        }
+        else
+        {
+            flush = Z_NO_FLUSH;
+        }
+        if (totin - last >= span)
+        {
+            // create a FLUSH point for an index point with window of size zero
+            // With gzip compression this should not affect compression performance
+            flush = Z_FULL_FLUSH;
+        }
+
+        strm.next_in = input;
+
+        /* run deflate() on input until output buffer not full, finish
+           compression if all of file_in has been read in */
+        do
+        {
+
+            strm.avail_out = CHUNK;
+            strm.next_out = output;
+            ret.error = deflate(&strm, flush);   /* no bad return value */
+            assert(ret.error != Z_STREAM_ERROR); /* state not clobbered */
+
+            have = CHUNK - strm.avail_out;
+            totout += have;
+
+            if (fwrite(output, 1, have, file_out) != have || ferror(file_out))
+            {
+                (void)deflateEnd(&strm);
+                goto compress_and_build_index_error;
+            }
+
+            // flush written content to disk
+            // fflush( file_out );
+
+        } while (strm.avail_out == 0);
+        assert(strm.avail_in == 0); /* all input will be used */
+
+        // generic check for growing files:
+        // check that file hasn't shrunk, what would mean that the file
+        // has been overwritten from the beginning (possible with logs, for example)
+        if (feof(file_in) &&
+            end_on_first_eof == 0)
+        { // if end_on_first_eof == 1, ret.error == Z_STREAM_END already
+            if (strlen(file_name) > 0)
+            { // this check cannot be done on STDIN
+                struct stat st;
+                stat(file_name, &st);
+                if ((uint64_t)st.st_size < totin)
+                {
+                    // file has shrunk! so do a correct finish of the action_create_index (whatever it is)
+                    // (Note that it is not possible that this condition arises when accessing a file
+                    // with size 0 (which is possible and allowed) because (0 < 0) is false )
+                    end_on_first_eof = 1;
+                    // loop will continue and because feof() will activate again (because source file
+                    // won't be overwritten so quick as to surpase actual total_in bytes) a Z_FINISH
+                    // will be written, and a Z_STREAM_END will be returned to end the process.
+                }
+            }
+        }
+
+        if (end_on_first_eof == 0 &&
+            strm.avail_in == 0 &&
+            feof(file_in))
+        {
+            // flush written content to disk
+            fflush(file_out);
+            // wait for file to grow
+            sleep(waiting_time);
+            clearerr(file_in);
+        }
+
+        /* done when last data in file processed */
+
+    } while (flush != Z_FINISH);
+
+    assert(ret.error == Z_STREAM_END); /* stream will be complete */
+
+    /* clean up and return */
+    (void)deflateEnd(&strm);
+
+    /* and return index (release unused entries in list) */
+    if (NULL != index &&
+        index->have > 0)
+    {
+        struct point *next = realloc(index->list, sizeof(struct point) * index->have);
+        if (NULL == next)
+        {
+            ret.error = Z_MEM_ERROR;
+            ret.value = 0;
+            goto compress_and_build_index_error;
+        }
+        index->list = next;
+        index->size = index->have;
+        index->file_size = totin; /* size of uncompressed file */
+        if (0 == there_are_more_chars && totlines > 1)
+        {
+            totlines--;
+        }
+        index->number_of_lines = totlines; /* lines in uncompressed file */
+    }
+
+    // once all index values are filled, close index file: a last call must be done
+    // with index_last_written_point = index->have
+    if (NULL != index &&
+        index->index_complete == 0)
+    {
+        if (!serialize_index_to_file(index_file, index, index->have))
+            goto compress_and_build_index_error;
+        if (strlen(index_filename) > 0)
+            printToStderr("Index written to '%s'.\n", index_filename);
+        else
+            printToStderr("Index written to STDOUT.\n");
+        /* index is now complete */
+    }
+
+    if (NULL != index_file)
+        fclose(index_file);
+
+    // print totin info
+    if (totin > 0)
+    {
+        printToStderr("%s (%llu Bytes) of data compressed.\n",
+                      giveMeSIUnits(totin, 1), totin);
+        if (extend_index_with_lines > 0 &&
+            totlines > 0)
+        {
+            printToStderr("%llu lines compressed.\n", totlines);
+            if (totlines > 1000)
+            {
+                printToStderr(" (%s).\n", giveMeSIUnits(totlines, 0));
+            }
+            else
+            {
+                printToStderr(".\n");
+            }
+        }
+        if (totout > 0)
+            printToStderr("%llu bytes of gzip data (%.2f%%).\n",
+                          totout, 100.0 - (double)totout / (double)totin * 100.0);
+    }
+
+    *built = index;
+    if (NULL != index)
+        ret.value = index->have;
+    else
+        ret.value = 0;
+
+    free(input);
+    free(output);
+
+    return ret;
+
+compress_and_build_index_error:
+    free(input);
+    free(output);
+
+    // flush written content to disk
+    fflush(file_out);
+
+    // print totin info
+    if (totin > 0)
+    {
+        printToStderr("%s (%llu Bytes) of data compressed.\n",
+                      giveMeSIUnits(totin, 1), totin);
+        if (extend_index_with_lines > 0 &&
+            totlines > 0)
+        {
+            printToStderr("%llu lines compressed", ((0 == there_are_more_chars) ? totlines - 1 : totlines));
+            if (totlines > 1000)
+            {
+                printToStderr(" (%s).\n", giveMeSIUnits(totlines, 0));
+            }
+            else
+            {
+                printToStderr(".\n");
+            }
+        }
+        if (totout > 0)
+            printToStderr("%s (%llu Bytes) of gzip data (%.2f%%).\n",
+                          giveMeSIUnits(totout, 1), totout, 100.0 - (double)totout / (double)totin * 100.0);
+    }
+
+    (void)deflateEnd(&strm);
+
+    if (always_create_a_complete_index == 1)
+    {
+        if (NULL != index)
+        {
+            index->file_size = totin; /* size of uncompressed file */
+            if (0 == there_are_more_chars && totlines > 1)
+            {
+                totlines--;
+            }
+            index->number_of_lines = totlines; /* lines in uncompressed file */
+            // return index pointer and write index to index file, ignoring the compression error
+            *built = index;
+            if (!serialize_index_to_file(index_file, index, index->have))
+                printToStderr("ERROR whilst writing index file '%s'.\n", index_file);
+        }
+    }
+    else
+    {
+        if (NULL != index)
+            free_index(index);
+        *built = NULL;
+    }
+
+    if (NULL != index_file)
+        fclose(index_file);
+    if (Z_OK == ret.error)
+        ret.error = Z_ERRNO;
+    return ret;
+}
+
 // Creates an index for a gzip file.
 // If index file already exists, it is completed if it weren't complete,
 // or directly used if it is complete.
@@ -2650,10 +3065,13 @@ decompress_file_error:
 //                                in the uncompressed stream from which to extract to stdout.
 //                                0 otherwise.
 // uint64_t span_between_points    : span between index points in bytes
+// int write_index_to_disk      : 1: will write/update the index as usual;
+//                                0: will just read, but do not write nor update (overwrite) it
 // int end_on_first_proper_gzip_eof: end file processing on first proper (at feof()) GZIP EOF
 //                                   (to be used when the file contains surely only one gzip stream)
 // int always_create_a_complete_index : create a 'complete' index file even in case of decompressing errors.
 //                                      Also an index pointer (**built) is returned, instead of NULL.
+// int waiting_time             : waiting time in seconds between reads when `-[ST]`
 // int force_action             : with `-[cd]`, force destination file overwriting if it exists
 // int wait_for_file_creation   : 0: exit with error if source file doesn't exist
 //                                1: wait for file creation if it doesn't yet exist, when using `-[STcd]`
@@ -2680,12 +3098,12 @@ decompress_file_error:
 //                                 Used here only when calling compress_and_build_index().
 // OUTPUT:
 // EXIT_* error code or EXIT_OK on success
-extern int action_create_index(
+local int action_create_index(
     char *file_name, struct access **index,
     char *index_filename, enum INDEX_AND_EXTRACTION_OPTIONS indx_n_extraction_opts,
     uint64_t offset, uint64_t line_number_offset, uint64_t span_between_points,
     int end_on_first_proper_gzip_eof, int always_create_a_complete_index,
-    int wait_for_file_creation,
+    int waiting_time, int wait_for_file_creation,
     int extend_index_with_lines, uint64_t expected_first_byte, int gzip_stream_may_be_damaged,
     bool lazy_gzip_stream_patching_at_eof,
     uint64_t range_number_of_bytes, uint64_t range_number_of_lines)
@@ -2717,14 +3135,15 @@ extern int action_create_index(
         file_in = fopen(file_name, "rb");
         if (NULL == file_in)
         {
-            if (wait_for_file_creation == 1)
+            if (wait_for_file_creation == 1 && 
+                indx_n_extraction_opts == COMPRESS_AND_CREATE_INDEX)
             {
                 if (waiting == 0)
                 {
                     printToStderr("Waiting for creation of file '%s'\n", file_name);
                     waiting = 1;
                 }
-                sleep(WAITING_TIME);
+                sleep(waiting_time);
                 goto action_create_index_wait_for_file_creation;
             }
             printToStderr("Could not open '%s' for reading.\nAborted.\n", file_name);
@@ -2740,6 +3159,73 @@ extern int action_create_index(
         printToStderr("Processing STDIN ...\n");
     }
 
+    if (indx_n_extraction_opts == COMPRESS_AND_CREATE_INDEX)
+    {
+        // compression !
+
+        // an output filename is necessary:
+        // this block directly provides de FILE *file_out pointer
+        if (strlen(file_name) > 0)
+        {
+            char *out_filename;
+            out_filename = malloc(strlen(file_name) + 3 + 1);
+            sprintf(out_filename, "%s.gz", file_name);
+            // check that destination file doesn't exist
+            if (access(out_filename, F_OK) != -1)
+            {
+                printToStderr("Using `-f` force option: Deleting '%s' ...\n", out_filename);
+            }
+            file_out = fopen(out_filename, "w+b");
+            if (NULL == file_out)
+            {
+                printToStderr("Could not open '%s' for writing.\nAborted.\n", out_filename);
+                free(out_filename);
+                return EXIT_GENERIC_ERROR;
+            }
+            printToStderr("Compressing to '%s'\n", out_filename);
+            free(out_filename);
+        }
+        else
+        {
+            // stdin
+            // If using STDIN, the output will be STDOUT
+            SET_BINARY_MODE(STDOUT); // sets binary mode for stdout in Windows
+            file_out = stdout;
+            printToStderr("Compressing to STDOUT ...\n");
+        }
+
+        if (extend_index_with_lines == 3)
+        {
+            extend_index_with_lines = 1; // in case of COMPRESS_AND_CREATE_INDEX, direct v1 index
+                                         // as no previous index is possible, so there's no doubt.
+        }
+
+        ret = compress_and_build_index(file_in, file_out,
+                                       file_name, span_between_points, index, index_filename,
+                                       ((end_on_first_proper_gzip_eof == 0) ? 1 : 0), // `-E` behaviour is inverted with `-c` for ease of use
+                                       always_create_a_complete_index, waiting_time,
+                                       extend_index_with_lines);
+
+        if (NULL != index && NULL != *index)
+        {
+            // it is important to set (*index)->file_name, if the index is to be reused,
+            // because the window data must be read from disk to be used.
+            if (NULL == (*index)->file_name)
+            {
+                (*index)->file_name = malloc(strlen(index_filename) + 1);
+                if (NULL == (*index)->file_name ||
+                    NULL == memcpy((*index)->file_name, index_filename, strlen(index_filename) + 1))
+                {
+                    printToStderr("Not enough memory to load index from file.\n");
+                    if (NULL != (*index)->file_name)
+                        free((*index)->file_name);
+                    return EXIT_GENERIC_ERROR;
+                }
+            }
+        }
+    }
+    else
+    {
         // decompression!
 
         // compute index:
@@ -2820,17 +3306,12 @@ extern int action_create_index(
             SET_BINARY_MODE(STDOUT); // sets binary mode for stdout in Windows
         }
 
-        // sets file_out accordingly with whether an index filename was specified
-        if (strlen(index_filename) > 0) {
-            file_out = fopen(index_filename, "w+");
-        } else {
-            file_out = stdout;
-        }
+        file_out = stdout;
 
         ret = decompress_and_build_index(file_in, file_out, file_name, span_between_points, index,
                                             indx_n_extraction_opts, offset, line_number_offset, index_filename,
                                             end_on_first_proper_gzip_eof, always_create_a_complete_index,
-                                            extend_index_with_lines, expected_first_byte,
+                                            waiting_time, extend_index_with_lines, expected_first_byte,
                                             gzip_stream_may_be_damaged, lazy_gzip_stream_patching_at_eof,
                                             range_number_of_bytes, range_number_of_lines);
 
@@ -2851,6 +3332,7 @@ extern int action_create_index(
                 }
             }
         }
+    }
 
     if (file_in != stdin)
         fclose(file_in);
@@ -3388,13 +3870,13 @@ int main(int argc, char **argv)
         }
     }
 
-    if (force_strict_order)
+    if (1 == force_strict_order)
     {
         printToStderr("ERROR: Cannot use `-F` with `-[dlSTu]`.\n");
         return EXIT_INVALID_OPTION;
     }
 
-    if (lazy_gzip_stream_patching_at_eof)
+    if (true == lazy_gzip_stream_patching_at_eof)
     {
         printToStderr("ERROR: without `-[ST]`, use `-p` instead of `-P`.\n");
         return EXIT_INVALID_OPTION;
@@ -3476,6 +3958,10 @@ int main(int argc, char **argv)
     {
         // index file already exists
 
+        /*if ( ( extend_index_with_lines > 0 && action != ACT_EXTRACT_FROM_LINE ) &&
+                ( force_action == 0 || ( force_action == 1 && write_index_to_disk == 0 ) ) )
+                printToStderr("WARNING: `-[Xx]` will be ignored because index already exists.\n" );*/
+
         // delete index file
         printToStderr("Using `-f` force option: Deleting '%s' ...\n", index_filename);
         if (remove(index_filename) != 0)
@@ -3498,7 +3984,7 @@ int main(int argc, char **argv)
         ret_value = action_create_index(file_name, &index, index_filename,
                                         JUST_CREATE_INDEX, 0, 0, span_between_points,
                                         end_on_first_proper_gzip_eof,
-                                        always_create_a_complete_index,
+                                        always_create_a_complete_index, WAITING_TIME,
                                         wait_for_file_creation, extend_index_with_lines,
                                         expected_first_byte, gzip_stream_may_be_damaged,
                                         lazy_gzip_stream_patching_at_eof,
@@ -3518,7 +4004,7 @@ int main(int argc, char **argv)
         ret_value = action_create_index(file_name, &index, index_filename,
                                         EXTRACT_FROM_BYTE, extract_from_byte, 0, span_between_points,
                                         end_on_first_proper_gzip_eof,
-                                        always_create_a_complete_index,
+                                        always_create_a_complete_index, WAITING_TIME,
                                         wait_for_file_creation, extend_index_with_lines,
                                         expected_first_byte, gzip_stream_may_be_damaged,
                                         lazy_gzip_stream_patching_at_eof,
@@ -3529,7 +4015,7 @@ int main(int argc, char **argv)
         ret_value = action_create_index(file_name, &index, index_filename,
                                         EXTRACT_FROM_LINE, 0, extract_from_line, span_between_points,
                                         end_on_first_proper_gzip_eof,
-                                        always_create_a_complete_index,
+                                        always_create_a_complete_index, WAITING_TIME,
                                         wait_for_file_creation, extend_index_with_lines,
                                         expected_first_byte, gzip_stream_may_be_damaged,
                                         lazy_gzip_stream_patching_at_eof,
@@ -3542,7 +4028,7 @@ int main(int argc, char **argv)
             ret_value = action_create_index(file_name, &index, index_filename,
                                             JUST_CREATE_INDEX, 0, 0, span_between_points,
                                             end_on_first_proper_gzip_eof,
-                                            always_create_a_complete_index,
+                                            always_create_a_complete_index, WAITING_TIME,
                                             wait_for_file_creation, extend_index_with_lines,
                                             expected_first_byte, gzip_stream_may_be_damaged,
                                             lazy_gzip_stream_patching_at_eof,
