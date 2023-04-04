@@ -1,68 +1,11 @@
+using System.IO;
+using System.Globalization;
 
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 
 namespace ParallelParsing.GZTool.NET;
-
-// [StructLayout(LayoutKind.Sequential)]
-// public unsafe struct Point
-// {
-// 	// corresponding offset in uncompressed data
-// 	internal UInt64 @out;
-// 	// offset in input file of first full byte
-// 	internal UInt64 @in;
-// 	// number of bits (1-7) from byte at in - 1, or 0
-// 	internal UInt32 bits;
-// 	// offset at index file where this compressed window is stored
-// 	internal UInt64 window_beginning;
-// 	// size of (compressed) window
-// 	internal UInt32 window_size;
-// 	// preceding 32K of uncompressed data, compressed
-// 	internal Byte* window;
-// 	internal UInt64 line_number;
-
-
-// 	public Point()
-// 	{
-// 		Window = new FixedArray<byte>(window, window_size);
-// 	}
-// }
-
-// public unsafe struct Index
-// {
-// 	// number of list entries filled in
-// 	internal UInt64 have;
-// 	// number of list entries allocated
-// 	internal UInt64 size;
-// 	// size of uncompressed file (useful for bgzip files)
-// 	internal UInt64 file_size;
-// 	// allocated list
-// 	internal Point* list;
-// 	// path to index file
-// 	[MarshalAs(UnmanagedType.LPStr)]
-// 	internal char* file_name;
-// 	// 1: index is complete; 0: index is (still) incomplete
-// 	internal int index_complete;
-// 	// 0: default; 1: index with line numbers
-// 	internal int index_version;
-// 	// 0: linux \r | windows \n\r; 1: mac \n
-// 	internal UInt32 line_number_format;
-// 	// number of lines (only used with v1 index format)
-// 	internal UInt64 number_of_lines;
-
-// 	public ulong FileSize;
-// 	public FixedArray<Point> List;
-// 	public string FileName;
-// 	public bool IsIndexComplete;
-// 	public int IndexVersion;
-// 	public uint LineNumberFormat;
-// 	public ulong NumberOfLines;
-// }
-
-// public unsafe struct access
-// {
-// }
-
 
 // 	/* index_version should be 0 (default), thus omitted */
 // 	/* line_number_format should be irrelevant if index contains no info about line number */
