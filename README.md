@@ -21,3 +21,58 @@ https://en.wikipedia.org/wiki/Database_index
 [zindex - index and search large gzipped files quickly](https://xania.org/201505/zindex-index-your-gzip-files)
 
 [gztool](https://github.com/circulosmeos/gztool)
+
+## Specification
+
+- **Function**: `CreateIndex`
+
+  Parameters: 
+
+  - Filename of the gzip file (complete path)
+  - Chunk size: how many records will be in one chunk, i.e. how sparse are the checkpoints
+
+  Returns:
+
+  - An index object in memory
+
+- **Function**: `Decompress`
+
+  Parameters:
+
+  - Filename of the gzip file (complete path)
+  - The corresponding index object in memory
+  - A specific checkpoint which associated chunk of records will be decompressed
+
+  Returns:
+
+  - The decompressed records
+
+  > Note: This must be thread safe
+
+- **Function**: `DecompressAll`
+
+  Parameters:
+
+  - Filename of the gzip file (complete path)
+  - The corresponding index object in memory
+
+  Returns:
+
+  - All the decompressed records
+
+- **Function**: `Serialize`
+
+  Parameters:
+
+  - Filename of the index file (complete path)
+  - The corresponding index object in memory
+
+- **Function**: `Deserialize`
+
+  Parameters:
+
+  - Filename of the index file (complete path)
+
+  Returns:
+
+  - The corresponding index object in memory
