@@ -54,57 +54,121 @@ public record struct ActionOptions(
 
 public unsafe class Point
 {
-	internal point* PtrPoint;
-	public ulong Output => PtrPoint->@out;
-	public ulong Input => PtrPoint->@in;
-	public uint Bits => PtrPoint->bits;
-	public ulong WindowBeginning => PtrPoint->window_beginning;
-	public uint WindowSize => PtrPoint->window_size;
-	public FixedArray<byte> Window { get; init; }
-	public ulong LineNumber => PtrPoint->line_number;
+	// internal point* PtrPoint;
+	// public ulong Output => PtrPoint->@out;
+	// public ulong Input => PtrPoint->@in;
+	// public uint Bits => PtrPoint->bits;
+	//// public ulong WindowBeginning => PtrPoint->window_beginning;
+	//// public uint WindowSize => PtrPoint->window_size;
+	// public FixedArray<byte> Window { get; init; }
+	//// public ulong LineNumber => PtrPoint->line_number;
 
-	internal Point(point* ptr)
-	{
-		PtrPoint = ptr;
-		Window = new FixedArray<byte>(PtrPoint->window, (uint)PtrPoint->window_beginning);
-	}
+	// internal Point(point* ptr)
+	// {
+	// 	PtrPoint = ptr;
+	// 	Window = new FixedArray<byte>(PtrPoint->window, Constants.WINSIZE);
+	// }
 
-	public static unsafe implicit operator Point(point* p) => new Point(p);
+	// public static unsafe implicit operator Point(point* p) => new Point(p);
+	public long Output;
+	public long Input;
+	public int Bits;
+	public byte[] Window = new byte[Constants.WINSIZE];
 }
 
 public unsafe class Index
 {
-	internal access* Access;
-	public ulong FileSize => Access->file_size;
-	public bool IsIndexComplete => Access->index_complete == 1;
-	public int IndexVersion => Access->index_version;
-	public int LineNumberFormat => Access->index_version;
-	public ulong NumberOfLines => Access->number_of_lines;
-	public string FileName => Marshal.PtrToStringAnsi(Access->file_name) ?? string.Empty;
-	public PointList List;
+	// internal index* Access;
+	//// public ulong FileSize => Access->file_size;
+	//// public bool IsIndexComplete => Access->index_complete == 1;
+	//// public int IndexVersion => Access->index_version;
+	//// public int LineNumberFormat => Access->index_version;
+	//// public ulong NumberOfLines => Access->number_of_lines;
+	//// public string FileName => Marshal.PtrToStringAnsi(Access->file_name) ?? string.Empty;
+	// public PointList List;
 
-	public Index(access* ptr)
-	{
-		Access = ptr;
-		List = new PointList(Access->list, Access->size);
-	}
+	// public Index(index* ptr)
+	// {
+	// 	Access = ptr;
+	// 	List = new PointList(Access->list, Access->have);
+	// }
 
-	public unsafe class PointList
-	{
-		internal point* PtrPoint;
-		public ulong Length;
+	// public unsafe class PointList
+	// {
+	// 	internal point* PtrPoint;
+	// 	public int Length;
 
-		public PointList(point* ptr, ulong length)
-		{
-			PtrPoint = ptr;
-			Length = length;
-		}
+	// 	public PointList(point* ptr, int length)
+	// 	{
+	// 		PtrPoint = ptr;
+	// 		Length = length;
+	// 	}
 
-		public Point this[ulong index]
-		{
-			get => PtrPoint + index;
-			set => *(PtrPoint + index) = *value.PtrPoint;
-		}
-	}
+	// 	public Point this[int index]
+	// 	{
+	// 		get => PtrPoint + index;
+	// 		set => *(PtrPoint + index) = *value.PtrPoint;
+	// 	}
+	// }
+	public List<Point> List = new List<Point>();
 }
 
+public static unsafe class Defined
+{
+	public static unsafe ZResult InflateInit2(ZStream strm, int windowBits)
+	{
+		var version = Marshal.StringToHGlobalAnsi(Constants.ZLIB_VERSION);
+		return (ZResult)ExternalCalls.inflateInit2_(strm, windowBits, version, sizeof(z_stream));
+	}
+
+
+	public static Index AddPoint(Index index, int bits, long input, long output, int left, char[] window)
+	{
+		Point next = new Point();
+
+		next.Bits = bits;
+		next.Input = input;
+		next.Output = output;
+
+		if (left != 0)
+		{
+			// ???
+		}
+
+		if (left < Constants.WINSIZE)
+		{
+			// ???
+		}
+
+		index.List.Add(next);
+
+		return index;
+	}
+
+	public ZResult BuildDeflateIndex(FileStream @in, long span, out Index? built)
+	{
+		ZResult ret;
+		// our own total counters to avoid 4GB limit
+		long totin, totout;
+		// totout value of last access point
+		long last;
+		// access points being generated
+		Index index = new Index();
+		ZStream strm = new ZStream();
+		byte[] input = new byte[Constants.CHUNK];
+		byte[] window = new byte[Constants.WINSIZE];
+
+		ret = InflateInit2(strm, 47);
+		if (ret != ZResult.OK)
+		{
+			built = null;
+			return ret;
+		}
+
+		totin = totout = last = 0;
+		do
+		{
+			
+		} while (true);
+	}
+}

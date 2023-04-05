@@ -49,14 +49,14 @@ public static class ExternalCalls
 	// public static unsafe extern int inflateInit_(
 	// 	z_stream* strm, char* version, int stream_size);
 
-	// [DllImport("libz.so", CharSet = CharSet.Ansi)]
-	// public static unsafe extern int inflateInit2_(
-	// 	z_stream* strm, int windowBits, char* version, int stream_size);
+	[DllImport("libz.so", CharSet = CharSet.Ansi)]
+	public static unsafe extern int inflateInit2_(
+		z_stream* strm, int windowBits, IntPtr version, int stream_size);
 
 	[DllImport("gztool", CharSet = CharSet.Ansi)]
 	public static unsafe extern EXIT_RETURNED_VALUES action_create_index(
 		[MarshalAs(UnmanagedType.LPStr)] char* file_name,
-		access** index,
+		index** index,
 		[MarshalAs(UnmanagedType.LPStr)] char* index_filename,
 		IndexAndExtractionOptions indx_n_extraction_opts,
 		UInt64 offset,
@@ -77,7 +77,7 @@ public static class ExternalCalls
 	[DllImport("gztool")]
 	public static unsafe extern int serialize_index_to_file(
 		IntPtr output_file,
-		access* index,
+		index* index,
 		UInt64 index_last_written_point
 	);
 
@@ -99,98 +99,113 @@ public unsafe struct point
 	internal UInt64 @in;
 	// number of bits (1-7) from byte at in - 1, or 0
 	internal UInt32 bits;
-	// offset at index file where this compressed window is stored
-	internal UInt64 window_beginning;
-	// size of (compressed) window
-	internal UInt32 window_size;
-	// preceding 32K of uncompressed data, compressed
+	//// // offset at index file where this compressed window is stored
+	//// internal UInt64 window_beginning;
+	// // size of (compressed) window
+	//// internal UInt32 window_size;
+	//// preceding 32K of uncompressed data, compressed
+	[MarshalAs(UnmanagedType.ByValArray, SizeConst = (int)Constants.WINSIZE)]
 	internal Byte* window;
-	internal UInt64 line_number;
+	//// internal UInt64 line_number;
 }
 
 [StructLayout(LayoutKind.Sequential)]
-public unsafe struct access
+public unsafe struct index
 {
 	// number of list entries filled in
-	internal UInt64 have;
-	// number of list entries allocated
-	internal UInt64 size;
-	// size of uncompressed file (useful for bgzip files)
-	internal UInt64 file_size;
+	internal int have;
+	// total length of uncompressed data
+	internal long length;
+	//// // number of list entries allocated
+	//// internal UInt64 size;
+	//// // size of uncompressed file (useful for bgzip files)
+	//// internal UInt64 file_size;
 	// allocated list
 	internal point* list;
-	// path to index file
-	internal IntPtr file_name;
-	// 1: index is complete; 0: index is (still) incomplete
-	internal int index_complete;
-	// 0: default; 1: index with line numbers
-	internal int index_version;
-	// 0: linux \r | windows \n\r; 1: mac \n
-	internal UInt32 line_number_format;
-	// number of lines (only used with v1 index format)
-	internal UInt64 number_of_lines;
+	//// // path to index file
+	//// internal IntPtr file_name;
+	//// // 1: index is complete; 0: index is (still) incomplete
+	//// internal int index_complete;
+	//// // 0: default; 1: index with line numbers
+	//// internal int index_version;
+	//// // 0: linux \r | windows \n\r; 1: mac \n
+	//// internal UInt32 line_number_format;
+	//// // number of lines (only used with v1 index format)
+	//// internal UInt64 number_of_lines;
 }
 
-// [StructLayout(LayoutKind.Sequential)]
-// public unsafe struct z_stream
-// {
-// 	[MarshalAs(UnmanagedType.LPArray)]
-// 	public char* next_in;
-// 	public uint avail_in;
-// 	public ulong total_in;
-// 	[MarshalAs(UnmanagedType.LPArray)]
-// 	public char* next_out;
-// 	public uint avail_out;
-// 	public ulong total_out;
-// 	[MarshalAs(UnmanagedType.LPStr)]
-// 	public char* msg;
-// 	public void* state;
-// 	// https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/proposals/csharp-9.0/function-pointers
-// 	// unused
-// 	public delegate* unmanaged[Cdecl]<void*, uint, uint, void*> zalloc;
-// 	// unused
-// 	public delegate* unmanaged[Cdecl]<void*, void*, void> zfree;
-// 	// unused
-// 	public void* opaque;
-// 	public int data_type;
-// 	// unused
-// 	public ulong adler;
-// 	// unused
-// 	public ulong reserved;
-// }
-
-// public class ZStream
-// {
-// 	public unsafe ZStream(z_stream* strm)
-// 	{
-// 		_Hndl = strm;
-// 		NextIn = new FixedArray<char>(_Hndl->next_in, _Hndl->avail_in);
-// 		NextOut = new FixedArray<char>(_Hndl->next_out, _Hndl->avail_out);
-// 	}
-
-// 	[FixedAddressValueType]
-// 	private unsafe z_stream* _Hndl;
-// 	public readonly FixedArray<char> NextIn;
-// 	public unsafe ulong TotalIn => _Hndl->total_in;
-// 	public readonly FixedArray<char> NextOut;
-// 	public unsafe ulong TotalOut => _Hndl->total_out;
-// 	public unsafe string? Message => Marshal.PtrToStringAnsi((IntPtr)_Hndl->msg);
-// 	public unsafe int DataType => _Hndl->data_type;
-
-// 	public static unsafe implicit operator z_stream*(ZStream strm)
-// 	{
-// 		return strm._Hndl;
-// 	}
-
-// 	public static unsafe implicit operator IntPtr(ZStream strm)
-// 	{
-// 		return (IntPtr)strm._Hndl;
-// 	}
-
-// }
-
-public static class Defined
+[StructLayout(LayoutKind.Sequential)]
+public unsafe struct z_stream
 {
+	[MarshalAs(UnmanagedType.LPArray)]
+	public char* next_in;
+	public uint avail_in;
+	public ulong total_in;
+	[MarshalAs(UnmanagedType.LPArray)]
+	public char* next_out;
+	public uint avail_out;
+	public ulong total_out;
+	[MarshalAs(UnmanagedType.LPStr)]
+	public char* msg;
+	public void* state;
+	// https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/proposals/csharp-9.0/function-pointers
+	// unused
+	public delegate* unmanaged[Cdecl]<void*, uint, uint, void*> zalloc;
+	// unused
+	public delegate* unmanaged[Cdecl]<void*, void*, void> zfree;
+	// unused
+	public void* opaque;
+	public int data_type;
+	// unused
+	public ulong adler;
+	// unused
+	public ulong reserved;
+}
+
+public class ZStream
+{
+	// public unsafe ZStream(z_stream* strm)
+	// {
+	// 	_Hndl = strm;
+	// 	NextIn = new FixedArray<char>(_Hndl->next_in, _Hndl->avail_in);
+	// 	NextOut = new FixedArray<char>(_Hndl->next_out, _Hndl->avail_out);
+	// }
+
+	[FixedAddressValueType]
+	internal unsafe z_stream* _Hndl;
+	public readonly FixedArray<char> NextIn;
+	public unsafe ulong TotalIn
+	{
+		get => _Hndl->total_in;
+		set => _Hndl->total_in = value;
+	}
+	public readonly FixedArray<char> NextOut;
+	public unsafe ulong TotalOut
+	{
+		get => _Hndl->total_out;
+		set => _Hndl->total_out = value;
+	}
+	public unsafe string? Message => Marshal.PtrToStringAnsi((IntPtr)_Hndl->msg);
+	public unsafe int DataType
+	{
+		get => _Hndl->data_type;
+		set => _Hndl->data_type = value;
+	}
+
+	public static unsafe implicit operator z_stream*(ZStream strm)
+	{
+		return strm._Hndl;
+	}
+
+	public static unsafe implicit operator IntPtr(ZStream strm)
+	{
+		return (IntPtr)strm._Hndl;
+	}
+
+}
+
+// public static class Defined
+// {
 	// private const string ZLIB_VERSION = "1.2.11";
 	
 	// public unsafe static ZResult DeflateInit(out ZStream strm, int level)
@@ -238,7 +253,7 @@ public static class Defined
 
 	// 	throw new NotImplementedException();
 	// }
-}
+// }
 
 public unsafe class FixedArray<T> where T : unmanaged
 {

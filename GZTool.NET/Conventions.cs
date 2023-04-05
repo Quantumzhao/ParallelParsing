@@ -154,9 +154,10 @@ public enum EXIT_RETURNED_VALUES
 
 public static class Constants
 {
+	public const string ZLIB_VERSION = "1.2.11";
 	public const int MAX_GIVE_ME_SI_UNIT_RETURNED_LENGTH = 14;
-	[Obsolete]
-	public static char[] number_output = new char[MAX_GIVE_ME_SI_UNIT_RETURNED_LENGTH]; 
+	// [Obsolete]
+	// public static char[] number_output = new char[MAX_GIVE_ME_SI_UNIT_RETURNED_LENGTH]; 
 	
 	// desired distance between access points
 	public const long SPAN = 10485760L;
