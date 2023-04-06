@@ -9,7 +9,7 @@ unsafe
 	var modes = Marshal.StringToHGlobalAnsi("rb");
 	void* file = ExternalCalls.fopen((char*)fileName, (char*)modes);
 	var len = Defined.deflate_index_build(file, Constants.SPAN, out var index);
-	Console.WriteLine((ZResult)len);
+	Console.WriteLine(len);
 
 	const int LEN = 16384;
 	byte* buf = (byte*)NativeMemory.Alloc(LEN);

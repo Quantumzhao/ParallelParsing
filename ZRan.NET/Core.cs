@@ -280,12 +280,13 @@ public static unsafe class Defined
 			return index.have;
 
 		}
-		finally
+		catch
 		{
 			inflateEnd(&strm);
 			if (index != null)
 				FreeDeflateIndex(index);
 			built = null;
+			return 0;
 		}
 	}
 
