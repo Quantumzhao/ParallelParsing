@@ -8,26 +8,26 @@ namespace ParallelParsing.ZRan.NET;
 
 public static class ExternalCalls
 {
-	[DllImport("libz.so", CharSet = CharSet.Ansi)]
-	public static unsafe extern int deflateEnd(nint strm);
+	// [DllImport("libz.so", CharSet = CharSet.Ansi)]
+	// public static unsafe extern int deflateEnd(nint strm);
 
-	[DllImport("libz.so", CharSet = CharSet.Ansi)]
-	public static unsafe extern int deflate(IntPtr strm, int flush);
+	// [DllImport("libz.so", CharSet = CharSet.Ansi)]
+	// public static unsafe extern int deflate(IntPtr strm, int flush);
 
-	[DllImport("libz.so", CharSet = CharSet.Ansi)]
-	public static unsafe extern int deflateInit_(
-		IntPtr strm, int level, IntPtr version, int stream_size);
+	// [DllImport("libz.so", CharSet = CharSet.Ansi)]
+	// public static unsafe extern int deflateInit_(
+	// 	IntPtr strm, int level, IntPtr version, int stream_size);
 
-	[DllImport("libz.so", CharSet = CharSet.Ansi)]
-	public static unsafe extern int deflateInit2_(
-		z_stream* strm, 
-		int level, int method, 
-		int windowBits, 
-		int memLevel, 
-		int strategy, 
-		char* version, 
-		int stream_size
-	);
+	// [DllImport("libz.so", CharSet = CharSet.Ansi)]
+	// public static unsafe extern int deflateInit2_(
+	// 	z_stream* strm, 
+	// 	int level, int method, 
+	// 	int windowBits, 
+	// 	int memLevel, 
+	// 	int strategy, 
+	// 	char* version, 
+	// 	int stream_size
+	// );
 
 	[DllImport("libz.so", CharSet = CharSet.Ansi)]
 	public static unsafe extern ZResult inflate(z_stream* strm, ZFlush flush);

@@ -17,4 +17,5 @@ unsafe
 	var ret = Defined.deflate_index_extract(file, index, 200, buf, 400);
 	Console.WriteLine(Marshal.PtrToStringAnsi((IntPtr)buf));
 	Defined.FreeDeflateIndex(index);
+	ExternalCalls.fclose(file);
 }
