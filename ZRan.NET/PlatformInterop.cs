@@ -51,7 +51,7 @@ public static class ExternalCalls
 
 	[DllImport("libz.so", CharSet = CharSet.Ansi)]
 	public static unsafe extern ZResult inflateInit2_(
-		z_stream* strm, int windowBits, IntPtr version, int stream_size);
+		z_stream* strm, int windowBits, char* version, int stream_size);
 
 	[DllImport("libz.so")]
 	public static unsafe extern ZResult inflateReset2(z_stream* strm, int windowBits);

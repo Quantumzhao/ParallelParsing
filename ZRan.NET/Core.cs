@@ -89,16 +89,28 @@ public unsafe struct Point
 	public long @out;
 	public long @in;
 	public int bits;
-	public byte* window;
+	public byte[] window;
 }
 
 public static unsafe class Defined
 {
 	public static ZResult InflateInit2(z_stream* strm, int windowBits)
 	{
-		var version = Marshal.StringToHGlobalAnsi(ZLIB_VERSION);
-		return (ZResult)inflateInit2_(strm, windowBits, version, sizeof(z_stream));
+		fixed (char* ptr = ZLIB_VERSION)
+		{
+			return (ZResult)inflateInit2_(strm, windowBits, ptr, sizeof(z_stream));
+		}
 	}
+
+	public static unsafe ZResult InflateSetDictionary(
+		z_stream* strm, byte[] dictionary, uint dictLength)
+	{
+		fixed (byte* ptr = dictionary)
+		{
+			return inflateSetDictionary(strm, ptr, dictLength);
+		}
+	}
+
 
 	// public static void FreeDeflateIndex(Index index)
 	// {
@@ -108,9 +120,9 @@ public static unsafe class Defined
 	// 	}
 	// }
 
-	public static Index AddPoint(Index index, int bits, long @in, long @out, uint left, byte* window)
+	public static Index AddPoint(Index index, int bits, long @in, long @out, uint left, byte[] window)
 	{
-		Point* next = (Point*)Alloc((nuint)sizeof(Point));
+		Point next = new Point();
 
 
 		// if list is full, make it bigger
@@ -123,16 +135,18 @@ public static unsafe class Defined
 
 		// fill in entry and increment how many we have
 		// next = (Point*)(index.list) + index.have;
-		next->bits = bits;
-		next->@in = @in;
-		next->@out = @out;
-		next->window = (byte*)Alloc(WINSIZE);
+		next.bits = bits;
+		next.@in = @in;
+		next.@out = @out;
+		next.window = new byte[WINSIZE];
 		if (left != 0)
-			Copy(window + WINSIZE - left, next->window, left);
+			Array.Copy(window, WINSIZE - left, next.window, 0, left);
+		// Copy(window + WINSIZE - left, next->window, left);
 		if (left < WINSIZE)
-			Copy(window, next->window + left, WINSIZE - left);
+			Array.Copy(window, 0, next.window, left, WINSIZE - left);
+		// Copy(window, next->window + left, WINSIZE - left);
 		// index.have++;
-		index.list.Add(*next);
+		index.list.Add(next);
 
 		// return list, possibly reallocated
 		return index;
@@ -158,7 +172,10 @@ public static unsafe class Defined
 			long totin, totout;        /* our own total counters to avoid 4GB limit */
 			long last;                 /* totout value of last access point */
 			byte* input = (byte*)Alloc(CHUNK);
-			byte* window = (byte*)Alloc(WINSIZE);
+			byte[] window = new byte[WINSIZE];
+
+			var hWindow = GCHandle.Alloc(
+				window, GCHandleType.Pinned);
 
 			/* initialize inflate */
 			strm.zalloc = null;
@@ -204,7 +221,7 @@ public static unsafe class Defined
 					if (strm.avail_out == 0)
 					{
 						strm.avail_out = WINSIZE;
-						strm.next_out = window;
+						strm.next_out = (byte*)hWindow.AddrOfPinnedObject();
 					}
 
 					/* inflate until out of input, output, or at end of block --
@@ -214,8 +231,8 @@ public static unsafe class Defined
 					ret = inflate(&strm, ZFlush.BLOCK);      /* return at end of block */
 					totin -= strm.avail_in;
 					totout -= strm.avail_out;
-					if (ret == ZResult.NEED_DICT || 
-						ret == ZResult.MEM_ERROR || 
+					if (ret == ZResult.NEED_DICT ||
+						ret == ZResult.MEM_ERROR ||
 						ret == ZResult.DATA_ERROR)
 						throw new ZException(ret);
 					if (ret == ZResult.STREAM_END)
@@ -255,19 +272,20 @@ public static unsafe class Defined
 
 			/* clean up and return index (release unused entries in list) */
 			inflateEnd(&strm);
+			hWindow.Free();
 			// index.list = (Point*)Realloc(index.list, (nuint)(sizeof(Point) * index.have));
 			// index.gzip = gzip;
 			index.length = totout;
 			built = index;
 			return index.list.Count;
 		}
-		catch
+		catch (ZException e)
 		{
 			inflateEnd(&strm);
 			// if (index != null)
 			// 	FreeDeflateIndex(index);
 			built = null;
-			return 0;
+			throw e;
 		}
 	}
 
@@ -281,169 +299,176 @@ public static unsafe class Defined
 	// reading or seeking the input file.
 	public static int deflate_index_extract(void* @in, Index index, long offset, byte* buf, int len)
 	{
-		ZResult ret;
-		int value = 0;
-		bool skip;
 		z_stream strm;
-		Point here;
-		byte* input = (byte*)Alloc(CHUNK);
-		byte* discard = (byte*)Alloc(WINSIZE);
-
-		/* proceed only if something reasonable to do */
-		if (len < 0)
-			return 0;
-
-		/* find where in stream to start */
-		// here = index.list;
-		var streamOffset = 0;
-		value = index.list.Count;
-		while (--value != 0 && index.list[streamOffset + 1].@out <= offset)
-			streamOffset++;
-		here = index.list[streamOffset];
-
-		/* initialize file and inflate state to start there */
-		strm.zalloc = null;
-		strm.zfree = null;
-		strm.opaque = null;
-		strm.avail_in = 0;
-		strm.next_in = null;
-		ret = InflateInit2(&strm, -15);         /* raw inflate */
-		if (ret != ZResult.OK)
-			throw new ZException(ret);
-		ret = (ZResult)fseeko(@in, here.@in - (here.bits != 0 ? 1 : 0), (int)SeekOpt.SET);
-		if (ret == ZResult.ERRNO)
-			throw new ZException(ret);
-		if (here.bits != 0)
+		
+		try
 		{
-			ret = (ZResult)getc(@in);
-			if (ret == ZResult.ERRNO)
-			{
-				ret = ferror(@in) != 0 ? ZResult.ERRNO : ZResult.DATA_ERROR;
+			ZResult ret;
+			int value = 0;
+			bool skip;
+			Point here;
+			byte* input = (byte*)Alloc(CHUNK);
+			byte* discard = (byte*)Alloc(WINSIZE);
+
+			/* proceed only if something reasonable to do */
+			if (len < 0)
+				return 0;
+
+			/* find where in stream to start */
+			// here = index.list;
+			var streamOffset = 0;
+			value = index.list.Count;
+			while (--value != 0 && index.list[streamOffset + 1].@out <= offset)
+				streamOffset++;
+			here = index.list[streamOffset];
+
+			/* initialize file and inflate state to start there */
+			strm.zalloc = null;
+			strm.zfree = null;
+			strm.opaque = null;
+			strm.avail_in = 0;
+			strm.next_in = null;
+			ret = InflateInit2(&strm, -15);         /* raw inflate */
+			if (ret != ZResult.OK)
 				throw new ZException(ret);
+			ret = (ZResult)fseeko(@in, here.@in - (here.bits != 0 ? 1 : 0), (int)SeekOpt.SET);
+			if (ret == ZResult.ERRNO)
+				throw new ZException(ret);
+			if (here.bits != 0)
+			{
+				ret = (ZResult)getc(@in);
+				if (ret == ZResult.ERRNO)
+				{
+					ret = ferror(@in) != 0 ? ZResult.ERRNO : ZResult.DATA_ERROR;
+					throw new ZException(ret);
+				}
+				inflatePrime(&strm, here.bits, value >> (8 - here.bits));
 			}
-			inflatePrime(&strm, here.bits, value >> (8 - here.bits));
-		}
-		inflateSetDictionary(&strm, here.window, WINSIZE);
+			InflateSetDictionary(&strm, here.window, WINSIZE);
 
-		/* skip uncompressed bytes until offset reached, then satisfy request */
-		offset -= here.@out;
-		strm.avail_in = 0;
-		skip = true;                               /* while skipping to offset */
-		do
-		{
-			/* define where to put uncompressed data, and how much */
-			if (offset > WINSIZE)
-			{             /* skip WINSIZE bytes */
-				strm.avail_out = WINSIZE;
-				strm.next_out = discard;
-				offset -= WINSIZE;
-			}
-			else if (offset > 0)
-			{              /* last skip */
-				strm.avail_out = (uint)offset;
-				strm.next_out = discard;
-				offset = 0;
-			}
-			else if (skip)
-			{                    /* at offset now */
-				strm.avail_out = (uint)len;
-				strm.next_out = buf;
-				skip = false;                       /* only do this once */
-			}
-
-			/* uncompress until avail_out filled, or end of stream */
+			/* skip uncompressed bytes until offset reached, then satisfy request */
+			offset -= here.@out;
+			strm.avail_in = 0;
+			skip = true;                               /* while skipping to offset */
 			do
 			{
-				if (strm.avail_in == 0)
+				/* define where to put uncompressed data, and how much */
+				if (offset > WINSIZE)
+				{             /* skip WINSIZE bytes */
+					strm.avail_out = WINSIZE;
+					strm.next_out = discard;
+					offset -= WINSIZE;
+				}
+				else if (offset > 0)
+				{              /* last skip */
+					strm.avail_out = (uint)offset;
+					strm.next_out = discard;
+					offset = 0;
+				}
+				else if (skip)
+				{                    /* at offset now */
+					strm.avail_out = (uint)len;
+					strm.next_out = buf;
+					skip = false;                       /* only do this once */
+				}
+
+				/* uncompress until avail_out filled, or end of stream */
+				do
 				{
-					strm.avail_in = fread(input, 1, CHUNK, @in);
-					if (ferror(@in) != 0)
-					{
-						throw new ZException(ZResult.ERRNO);
-					}
 					if (strm.avail_in == 0)
 					{
-						throw new ZException(ZResult.DATA_ERROR);
-					}
-					strm.next_in = input;
-				}
-				ret = inflate(&strm, ZFlush.NO_FLUSH);       /* normal inflate */
-				if (ret == ZResult.MEM_ERROR || ret == ZResult.DATA_ERROR || ret == ZResult.NEED_DICT)
-					throw new ZException(ret);
-				if (ret == ZResult.STREAM_END)
-				{
-					/* the raw deflate stream has ended */
-					// if (index.gzip == 0)
-					// 	/* this is a zlib stream that has ended -- done */
-					// 	break;
-
-					/* near the end of a gzip member, which might be followed by
-					   another gzip member -- skip the gzip trailer and see if
-					   there is more input after it */
-					if (strm.avail_in < 8)
-					{
-						fseeko(@in, 8 - strm.avail_in, (int)SeekOpt.CUR);
-						strm.avail_in = 0;
-					}
-					else
-					{
-						strm.avail_in -= 8;
-						strm.next_in += 8;
-					}
-					if (strm.avail_in == 0 && ungetc(getc(@in), @in) == EOF)
-						/* the input ended after the gzip trailer -- done */
-						break;
-
-					/* there is more input, so another gzip member should follow --
-					   validate and skip the gzip header */
-					ret = inflateReset2(&strm, 31);
-					if (ret != ZResult.OK)
-						throw new ZException(ret);
-					do
-					{
+						strm.avail_in = fread(input, 1, CHUNK, @in);
+						if (ferror(@in) != 0)
+						{
+							throw new ZException(ZResult.ERRNO);
+						}
 						if (strm.avail_in == 0)
 						{
-							strm.avail_in = fread(input, 1, CHUNK, @in);
-							if (ferror(@in) != 0)
-							{
-								ret = ZResult.ERRNO;
-								throw new ZException(ZResult.ERRNO);
-							}
+							throw new ZException(ZResult.DATA_ERROR);
+						}
+						strm.next_in = input;
+					}
+					ret = inflate(&strm, ZFlush.NO_FLUSH);       /* normal inflate */
+					if (ret == ZResult.MEM_ERROR || ret == ZResult.DATA_ERROR || ret == ZResult.NEED_DICT)
+						throw new ZException(ret);
+					if (ret == ZResult.STREAM_END)
+					{
+						/* the raw deflate stream has ended */
+						// if (index.gzip == 0)
+						// 	/* this is a zlib stream that has ended -- done */
+						// 	break;
+
+						/* near the end of a gzip member, which might be followed by
+						   another gzip member -- skip the gzip trailer and see if
+						   there is more input after it */
+						if (strm.avail_in < 8)
+						{
+							fseeko(@in, 8 - strm.avail_in, (int)SeekOpt.CUR);
+							strm.avail_in = 0;
+						}
+						else
+						{
+							strm.avail_in -= 8;
+							strm.next_in += 8;
+						}
+						if (strm.avail_in == 0 && ungetc(getc(@in), @in) == EOF)
+							/* the input ended after the gzip trailer -- done */
+							break;
+
+						/* there is more input, so another gzip member should follow --
+						   validate and skip the gzip header */
+						ret = inflateReset2(&strm, 31);
+						if (ret != ZResult.OK)
+							throw new ZException(ret);
+						do
+						{
 							if (strm.avail_in == 0)
 							{
-								ret = ZResult.DATA_ERROR;
-								throw new ZException(ZResult.DATA_ERROR);
+								strm.avail_in = fread(input, 1, CHUNK, @in);
+								if (ferror(@in) != 0)
+								{
+									ret = ZResult.ERRNO;
+									throw new ZException(ZResult.ERRNO);
+								}
+								if (strm.avail_in == 0)
+								{
+									ret = ZResult.DATA_ERROR;
+									throw new ZException(ZResult.DATA_ERROR);
+								}
+								strm.next_in = input;
 							}
-							strm.next_in = input;
-						}
-						ret = inflate(&strm, ZFlush.BLOCK);
-						if (ret == ZResult.MEM_ERROR || ret == ZResult.DATA_ERROR)
+							ret = inflate(&strm, ZFlush.BLOCK);
+							if (ret == ZResult.MEM_ERROR || ret == ZResult.DATA_ERROR)
+								throw new ZException(ret);
+						} while ((strm.data_type & 128) == 0);
+
+						/* set up to continue decompression of the raw deflate stream
+						   that follows the gzip header */
+						ret = inflateReset2(&strm, -15);
+						if (ret != ZResult.OK)
 							throw new ZException(ret);
-					} while ((strm.data_type & 128) == 0);
+					}
 
-					/* set up to continue decompression of the raw deflate stream
-					   that follows the gzip header */
-					ret = inflateReset2(&strm, -15);
-					if (ret != ZResult.OK)
-						throw new ZException(ret);
-				}
+					/* continue to process the available input before reading more */
+				} while (strm.avail_out != 0);
 
-				/* continue to process the available input before reading more */
-			} while (strm.avail_out != 0);
+				if (ret == ZResult.STREAM_END)
+					/* reached the end of the compressed data -- return the data that
+					   was available, possibly less than requested */
+					break;
 
-			if (ret == ZResult.STREAM_END)
-				/* reached the end of the compressed data -- return the data that
-				   was available, possibly less than requested */
-				break;
+				/* do until offset reached and requested data read */
+			} while (skip);
 
-			/* do until offset reached and requested data read */
-		} while (skip);
+			/* compute the number of uncompressed bytes read after the offset */
+			value = skip ? 0 : len - (int)strm.avail_out;
 
-		/* compute the number of uncompressed bytes read after the offset */
-		value = skip ? 0 : len - (int)strm.avail_out;
-
-	/* clean up and return the bytes read, or the negative error */
-		inflateEnd(&strm);
-		return value;
+			return value;
+		}
+		finally
+		{
+			/* clean up and return the bytes read, or the negative error */
+			inflateEnd(&strm);
+		}
 	}
 }
