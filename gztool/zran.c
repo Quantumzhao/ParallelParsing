@@ -398,6 +398,8 @@ int deflate_index_extract(FILE *in, struct deflate_index *index, off_t offset,
     return ret;
 }
 
+#define TEST
+
 #ifdef TEST
 
 #define SPAN 1048576L       /* desired distance between access points */
@@ -467,7 +469,7 @@ int main(int argc, char **argv)
                 len == Z_MEM_ERROR ? "out of memory" : "input corrupted");
     else {
         fwrite(buf, 1, len, stdout);
-        fprintf(stderr, "zran: extracted %d bytes at %llu\n", len, offset);
+        fprintf(stderr, "zran: extracted %d bytes at %lu\n", len, offset);
     }
 
     /* clean up and exit */

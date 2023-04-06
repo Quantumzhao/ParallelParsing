@@ -8,141 +8,127 @@ namespace ParallelParsing.GZTool.NET;
 
 public static class ExternalCalls
 {
-	// [DllImport("libz.so", CharSet = CharSet.Ansi)]
-	// public static unsafe extern int deflateEnd(nint strm);
-
-	// [DllImport("libz.so", CharSet = CharSet.Ansi)]
-	// public static unsafe extern int deflate(IntPtr strm, int flush);
-
-	// [DllImport("libz.so", CharSet = CharSet.Ansi)]
-	// public static unsafe extern int deflateInit_(
-	// 	IntPtr strm, int level, IntPtr version, int stream_size);
-
-	// [DllImport("libz.so", CharSet = CharSet.Ansi)]
-	// public static unsafe extern int deflateInit2_(
-	// 	z_stream* strm, 
-	// 	int level, int method, 
-	// 	int windowBits, 
-	// 	int memLevel, 
-	// 	int strategy, 
-	// 	char* version, 
-	// 	int stream_size
-	// );
-
-	// [DllImport("libz.so", CharSet = CharSet.Ansi)]
-	// public static unsafe extern int inflate(z_stream* strm, int flush);
-
-	// [DllImport("libz.so", CharSet = CharSet.Ansi)]
-	// public static unsafe extern int inflateEnd(z_stream* strm, int flush);
-
-	// [DllImport("libz.so", CharSet = CharSet.Ansi)]
-	// public static unsafe extern int inflatePrime(z_stream* strm, int bits, int value);
-
-	// [DllImport("libz.so", CharSet = CharSet.Ansi)]
-	// public static unsafe extern int inflateSetDictionary(
-	// 	z_stream* strm, byte* dictionary, uint dictLength);
-
-	// [DllImport("libz.so", CharSet = CharSet.Ansi)]
-	// public static unsafe extern int inflateCopy(z_stream* dest, z_stream* source);
-
-	// [DllImport("libz.so", CharSet = CharSet.Ansi)]
-	// public static unsafe extern int inflateInit_(
-	// 	z_stream* strm, char* version, int stream_size);
+	[DllImport("libz.so", CharSet = CharSet.Ansi)]
+	public static unsafe extern int deflateEnd(nint strm);
 
 	[DllImport("libz.so", CharSet = CharSet.Ansi)]
-	public static unsafe extern int inflateInit2_(
+	public static unsafe extern int deflate(IntPtr strm, int flush);
+
+	[DllImport("libz.so", CharSet = CharSet.Ansi)]
+	public static unsafe extern int deflateInit_(
+		IntPtr strm, int level, IntPtr version, int stream_size);
+
+	[DllImport("libz.so", CharSet = CharSet.Ansi)]
+	public static unsafe extern int deflateInit2_(
+		z_stream* strm, 
+		int level, int method, 
+		int windowBits, 
+		int memLevel, 
+		int strategy, 
+		char* version, 
+		int stream_size
+	);
+
+	[DllImport("libz.so", CharSet = CharSet.Ansi)]
+	public static unsafe extern ZResult inflate(z_stream* strm, ZFlush flush);
+
+	[DllImport("libz.so", CharSet = CharSet.Ansi)]
+	public static unsafe extern ZResult inflateEnd(z_stream* strm);
+
+	[DllImport("libz.so", CharSet = CharSet.Ansi)]
+	public static unsafe extern ZResult inflatePrime(z_stream* strm, int bits, int value);
+
+	[DllImport("libz.so", CharSet = CharSet.Ansi)]
+	public static unsafe extern ZResult inflateSetDictionary(
+		z_stream* strm, byte* dictionary, uint dictLength);
+
+	[DllImport("libz.so", CharSet = CharSet.Ansi)]
+	public static unsafe extern ZResult inflateCopy(z_stream* dest, z_stream* source);
+
+	[DllImport("libz.so", CharSet = CharSet.Ansi)]
+	public static unsafe extern ZResult inflateInit_(
+		z_stream* strm, char* version, int stream_size);
+
+	[DllImport("libz.so", CharSet = CharSet.Ansi)]
+	public static unsafe extern ZResult inflateInit2_(
 		z_stream* strm, int windowBits, IntPtr version, int stream_size);
 
-	[DllImport("gztool", CharSet = CharSet.Ansi)]
-	public static unsafe extern EXIT_RETURNED_VALUES action_create_index(
-		[MarshalAs(UnmanagedType.LPStr)] char* file_name,
-		index** index,
-		[MarshalAs(UnmanagedType.LPStr)] char* index_filename,
-		IndexAndExtractionOptions indx_n_extraction_opts,
-		UInt64 offset,
-		UInt64 line_number_offset,
-		UInt64 span_between_points,
-		Int32 end_on_first_proper_gzip_eof,
-		Int32 always_create_a_complete_index,
-		Int32 waiting_time,
-		Int32 wait_for_file_creation,
-		Int32 extend_index_with_lines,
-		UInt64 expected_first_byte,
-		Int32 gzip_stream_may_be_damaged,
-		[MarshalAs(UnmanagedType.I1)] bool lazy_gzip_stream_patching_at_eof,
-		UInt64 range_number_of_bytes,
-		UInt64 range_number_of_lines
-	);
+	[DllImport("libz.so")]
+	public static unsafe extern ZResult inflateReset2(z_stream* strm, int windowBits);
+	
+	[DllImport("libz.so")]
+	public static unsafe extern ZResult inflateReset(z_stream* strm);
 
-	[DllImport("gztool")]
-	public static unsafe extern int serialize_index_to_file(
-		IntPtr output_file,
-		index* index,
-		UInt64 index_last_written_point
-	);
+	[DllImport("libc.a", CharSet = CharSet.Ansi)]
+	public static unsafe extern int fprintf(void* stream, char* format, int param);
 
-	[DllImport("gztool", CharSet = CharSet.Ansi)]
-	public static unsafe extern int deserialize_index_from_file(
-		IntPtr input_file, 
-		int load_windows, 
-		[MarshalAs(UnmanagedType.LPStr)] char* file_name,
-		int extern_index_with_lines
-	);
-}
+	[DllImport("libc.a", CharSet = CharSet.Ansi)]
+	public static unsafe extern int fprintf(void* stream, char* format, int param1, int param2);
 
-[StructLayout(LayoutKind.Sequential)]
-public unsafe struct point
-{
-	// corresponding offset in uncompressed data
-	internal UInt64 @out;
-	// offset in input file of first full byte
-	internal UInt64 @in;
-	// number of bits (1-7) from byte at in - 1, or 0
-	internal UInt32 bits;
-	//// // offset at index file where this compressed window is stored
-	//// internal UInt64 window_beginning;
-	// // size of (compressed) window
-	//// internal UInt32 window_size;
-	//// preceding 32K of uncompressed data, compressed
-	[MarshalAs(UnmanagedType.ByValArray, SizeConst = (int)Constants.WINSIZE)]
-	internal Byte* window;
-	//// internal UInt64 line_number;
-}
+	[DllImport("libc.a", CharSet = CharSet.Ansi)]
+	public static unsafe extern int fclose(void* stream);
 
-[StructLayout(LayoutKind.Sequential)]
-public unsafe struct index
-{
-	// number of list entries filled in
-	internal int have;
-	// total length of uncompressed data
-	internal long length;
-	//// // number of list entries allocated
-	//// internal UInt64 size;
-	//// // size of uncompressed file (useful for bgzip files)
-	//// internal UInt64 file_size;
-	// allocated list
-	internal point* list;
-	//// // path to index file
-	//// internal IntPtr file_name;
-	//// // 1: index is complete; 0: index is (still) incomplete
-	//// internal int index_complete;
-	//// // 0: default; 1: index with line numbers
-	//// internal int index_version;
-	//// // 0: linux \r | windows \n\r; 1: mac \n
-	//// internal UInt32 line_number_format;
-	//// // number of lines (only used with v1 index format)
-	//// internal UInt64 number_of_lines;
+	[DllImport("libc.a", CharSet = CharSet.Ansi)]
+	public static unsafe extern int ferror(void* stream);
+
+	[DllImport("libc.a", CharSet = CharSet.Ansi)]
+	public static unsafe extern int fseeko(void* stream, long off, int whence);
+
+	[DllImport("libc.a", CharSet = CharSet.Ansi)]
+	public static unsafe extern uint fread(void* ptr, ulong size, ulong n, void* stream);
+
+	[DllImport("libc.a", CharSet = CharSet.Ansi)]
+	public static unsafe extern int getc(void* stream);
+
+	[DllImport("libc.a", CharSet = CharSet.Ansi)]
+	public static unsafe extern int ungetc(int c, void* stream);
+
+	// [DllImport("gztool", CharSet = CharSet.Ansi)]
+	// public static unsafe extern EXIT_RETURNED_VALUES action_create_index(
+	// 	[MarshalAs(UnmanagedType.LPStr)] char* file_name,
+	// 	index** index,
+	// 	[MarshalAs(UnmanagedType.LPStr)] char* index_filename,
+	// 	IndexAndExtractionOptions indx_n_extraction_opts,
+	// 	UInt64 offset,
+	// 	UInt64 line_number_offset,
+	// 	UInt64 span_between_points,
+	// 	Int32 end_on_first_proper_gzip_eof,
+	// 	Int32 always_create_a_complete_index,
+	// 	Int32 waiting_time,
+	// 	Int32 wait_for_file_creation,
+	// 	Int32 extend_index_with_lines,
+	// 	UInt64 expected_first_byte,
+	// 	Int32 gzip_stream_may_be_damaged,
+	// 	[MarshalAs(UnmanagedType.I1)] bool lazy_gzip_stream_patching_at_eof,
+	// 	UInt64 range_number_of_bytes,
+	// 	UInt64 range_number_of_lines
+	// );
+
+	// [DllImport("gztool")]
+	// public static unsafe extern int serialize_index_to_file(
+	// 	IntPtr output_file,
+	// 	index* index,
+	// 	UInt64 index_last_written_point
+	// );
+
+	// [DllImport("gztool", CharSet = CharSet.Ansi)]
+	// public static unsafe extern int deserialize_index_from_file(
+	// 	IntPtr input_file, 
+	// 	int load_windows, 
+	// 	[MarshalAs(UnmanagedType.LPStr)] char* file_name,
+	// 	int extern_index_with_lines
+	// );
 }
 
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct z_stream
 {
 	[MarshalAs(UnmanagedType.LPArray)]
-	public char* next_in;
+	public byte* next_in;
 	public uint avail_in;
 	public ulong total_in;
 	[MarshalAs(UnmanagedType.LPArray)]
-	public char* next_out;
+	public byte* next_out;
 	public uint avail_out;
 	public ulong total_out;
 	[MarshalAs(UnmanagedType.LPStr)]
@@ -162,47 +148,47 @@ public unsafe struct z_stream
 	public ulong reserved;
 }
 
-public class ZStream
-{
-	// public unsafe ZStream(z_stream* strm)
-	// {
-	// 	_Hndl = strm;
-	// 	NextIn = new FixedArray<char>(_Hndl->next_in, _Hndl->avail_in);
-	// 	NextOut = new FixedArray<char>(_Hndl->next_out, _Hndl->avail_out);
-	// }
+// public class ZStream
+// {
+// 	// public unsafe ZStream(z_stream* strm)
+// 	// {
+// 	// 	_Hndl = strm;
+// 	// 	NextIn = new FixedArray<char>(_Hndl->next_in, _Hndl->avail_in);
+// 	// 	NextOut = new FixedArray<char>(_Hndl->next_out, _Hndl->avail_out);
+// 	// }
 
-	[FixedAddressValueType]
-	internal unsafe z_stream* _Hndl;
-	public readonly FixedArray<char> NextIn;
-	public unsafe ulong TotalIn
-	{
-		get => _Hndl->total_in;
-		set => _Hndl->total_in = value;
-	}
-	public readonly FixedArray<char> NextOut;
-	public unsafe ulong TotalOut
-	{
-		get => _Hndl->total_out;
-		set => _Hndl->total_out = value;
-	}
-	public unsafe string? Message => Marshal.PtrToStringAnsi((IntPtr)_Hndl->msg);
-	public unsafe int DataType
-	{
-		get => _Hndl->data_type;
-		set => _Hndl->data_type = value;
-	}
+// 	[FixedAddressValueType]
+// 	internal unsafe z_stream* _Hndl;
+// 	public readonly FixedArray<char> NextIn;
+// 	public unsafe ulong TotalIn
+// 	{
+// 		get => _Hndl->total_in;
+// 		set => _Hndl->total_in = value;
+// 	}
+// 	public readonly FixedArray<char> NextOut;
+// 	public unsafe ulong TotalOut
+// 	{
+// 		get => _Hndl->total_out;
+// 		set => _Hndl->total_out = value;
+// 	}
+// 	public unsafe string? Message => Marshal.PtrToStringAnsi((IntPtr)_Hndl->msg);
+// 	public unsafe int DataType
+// 	{
+// 		get => _Hndl->data_type;
+// 		set => _Hndl->data_type = value;
+// 	}
 
-	public static unsafe implicit operator z_stream*(ZStream strm)
-	{
-		return strm._Hndl;
-	}
+// 	public static unsafe implicit operator z_stream*(ZStream strm)
+// 	{
+// 		return strm._Hndl;
+// 	}
 
-	public static unsafe implicit operator IntPtr(ZStream strm)
-	{
-		return (IntPtr)strm._Hndl;
-	}
+// 	public static unsafe implicit operator IntPtr(ZStream strm)
+// 	{
+// 		return (IntPtr)strm._Hndl;
+// 	}
 
-}
+// }
 
 // public static class Defined
 // {

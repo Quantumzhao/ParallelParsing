@@ -70,7 +70,7 @@ namespace ParallelParsing.GZTool.NET;
 // 	// 		{
 // 	// 			strm.NextOut = output;
 // 	// 		} while (true);
-			
+
 // 	// 	} while (flush != ZSignal.FINISH);
 
 // 	// 	if (ret != ZResult.STREAM_END) throw new UnreachableException();
@@ -144,12 +144,42 @@ public enum ZSignal
 	TREES
 }
 
-public enum EXIT_RETURNED_VALUES
+public enum ExitReturnedValues
 {
 	OK = 0,
 	GENERIC_ERROR = 1,
 	INVALID_OPTION = 2,
 	FILE_OVERWRITTEN = 100
+}
+
+public enum ZFlush
+{
+	NO_FLUSH,
+	PARTIAL_FLUSH,
+	SYNC_FLUSH,
+	FULL_FLUSH,
+	FINISH,
+	BLOCK,
+	TREES
+}
+
+public enum SeekOpt
+{
+	SET,
+	CUR,
+	END
+}
+
+public struct ZReturn
+{
+	ZResult Res;
+	int Val;
+
+	public static implicit operator ZReturn(int val) => new ZReturn { Val = val };
+	public static implicit operator ZReturn(ZResult res) => new ZReturn { Res = res };
+	public static implicit operator ZResult(ZReturn ret) => ret.Res;
+	public static ZReturn operator --(ZReturn ret) => --ret.Val;
+	public int ToInt() => Val;
 }
 
 public static class Constants
@@ -158,7 +188,7 @@ public static class Constants
 	public const int MAX_GIVE_ME_SI_UNIT_RETURNED_LENGTH = 14;
 	// [Obsolete]
 	// public static char[] number_output = new char[MAX_GIVE_ME_SI_UNIT_RETURNED_LENGTH]; 
-	
+
 	// desired distance between access points
 	public const long SPAN = 10485760L;
 
@@ -194,11 +224,13 @@ public static class Constants
 
 	// how many CHUNKs will be look to backwards for a new good gzip reentry point after an error is found (with `-p`)
 	public const int CHUNKS_TO_LOOK_BACKWARDS = 3;
+
+	public const int EOF = -1;
 }
 
 [Obsolete]
-public class GenericException : Exception 
-{ 
+public class GenericException : Exception
+{
 	public GenericException(string message) : base(message) { }
 }
 
