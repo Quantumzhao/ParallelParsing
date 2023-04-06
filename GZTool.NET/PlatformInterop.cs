@@ -59,29 +59,32 @@ public static class ExternalCalls
 	[DllImport("libz.so")]
 	public static unsafe extern ZResult inflateReset(z_stream* strm);
 
-	[DllImport("libc.a", CharSet = CharSet.Ansi)]
+	[DllImport("/usr/lib/x86_64-linux-gnu/libc.so.6", CharSet = CharSet.Ansi)]
 	public static unsafe extern int fprintf(void* stream, char* format, int param);
 
-	[DllImport("libc.a", CharSet = CharSet.Ansi)]
+	[DllImport("/usr/lib/x86_64-linux-gnu/libc.so.6", CharSet = CharSet.Ansi)]
 	public static unsafe extern int fprintf(void* stream, char* format, int param1, int param2);
 
-	[DllImport("libc.a", CharSet = CharSet.Ansi)]
+	[DllImport("/usr/lib/x86_64-linux-gnu/libc.so.6", CharSet = CharSet.Ansi)]
 	public static unsafe extern int fclose(void* stream);
 
-	[DllImport("libc.a", CharSet = CharSet.Ansi)]
+	[DllImport("/usr/lib/x86_64-linux-gnu/libc.so.6", CharSet = CharSet.Ansi)]
 	public static unsafe extern int ferror(void* stream);
 
-	[DllImport("libc.a", CharSet = CharSet.Ansi)]
+	[DllImport("/usr/lib/x86_64-linux-gnu/libc.so.6", CharSet = CharSet.Ansi)]
 	public static unsafe extern int fseeko(void* stream, long off, int whence);
 
-	[DllImport("libc.a", CharSet = CharSet.Ansi)]
+	[DllImport("/usr/lib/x86_64-linux-gnu/libc.so.6", CharSet = CharSet.Ansi)]
 	public static unsafe extern uint fread(void* ptr, ulong size, ulong n, void* stream);
 
-	[DllImport("libc.a", CharSet = CharSet.Ansi)]
+	[DllImport("/usr/lib/x86_64-linux-gnu/libc.so.6", CharSet = CharSet.Ansi)]
 	public static unsafe extern int getc(void* stream);
 
-	[DllImport("libc.a", CharSet = CharSet.Ansi)]
+	[DllImport("/usr/lib/x86_64-linux-gnu/libc.so.6", CharSet = CharSet.Ansi)]
 	public static unsafe extern int ungetc(int c, void* stream);
+
+	[DllImport("/usr/lib/x86_64-linux-gnu/libc.so.6", CharSet = CharSet.Ansi)]
+	public static unsafe extern void* fopen(char* file_name, char* modes);
 
 	// [DllImport("gztool", CharSet = CharSet.Ansi)]
 	// public static unsafe extern EXIT_RETURNED_VALUES action_create_index(

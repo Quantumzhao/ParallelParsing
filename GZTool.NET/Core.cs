@@ -155,10 +155,11 @@ public static unsafe class Defined
 		next->bits = bits;
 		next->@in = @in;
 		next->@out = @out;
+		next->window = (byte*)Alloc(WINSIZE);
 		if (left != 0)
-			Copy(next->window, window + WINSIZE - left, left);
+			Copy(window + WINSIZE - left, next->window, left);
 		if (left < WINSIZE)
-			Copy(next->window + left, window, WINSIZE - left);
+			Copy(window, next->window + left, WINSIZE - left);
 		index->have++;
 
 		// return list, possibly reallocated
