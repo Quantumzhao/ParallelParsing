@@ -71,16 +71,16 @@ namespace ParallelParsing.ZRan.NET;
 
 public unsafe class Index
 {
-	public int have;
-	public int gzip;
+	// public int have;
+	// public int gzip;
 	public long length;
-	public Point* list;
+	public List<Point> list;
 
 	public Index()
 	{
-		gzip = 8;
-		have = 0;
-		list = (Point*)Alloc((nuint)sizeof(Point) << 3);
+		// gzip = 8;
+		// have = 0;
+		list = new List<Point>(8);
 	}
 }
 
@@ -100,48 +100,29 @@ public static unsafe class Defined
 		return (ZResult)inflateInit2_(strm, windowBits, version, sizeof(z_stream));
 	}
 
-	public static void FreeDeflateIndex(Index index)
-	{
-		if (index != null)
-		{
-			Free(index.list);
-			// Free(index);
-		}
-	}
+	// public static void FreeDeflateIndex(Index index)
+	// {
+	// 	if (index != null)
+	// 	{
+	// 		Free(index.list);
+	// 	}
+	// }
 
 	public static Index AddPoint(Index index, int bits, long @in, long @out, uint left, byte* window)
 	{
-		Point* next;
+		Point* next = (Point*)Alloc((nuint)sizeof(Point));
 
-		// if (index == null)
-		// {
-		// 	index = (Index*)Alloc((nuint)sizeof(Index));
-		// 	if (index == null) return null;
-		// 	index.list = (Point*)Alloc((nuint)sizeof(Point) << 3);
-		// 	if (index.list == null)
-		// 	{
-		// 		Free(index);
-		// 		return null;
-		// 	}
-		// 	index.gzip = 8;
-		// 	index.have = 0;
-		// }
 
 		// if list is full, make it bigger
-		if (index.have == index.gzip)
-		{
-			index.gzip <<= 1;
-			next = (Point*)Realloc(index.list, (nuint)(sizeof(Point) * index.gzip));
-			// if (next == null)
-			// {
-			// 	FreeDeflateIndex(index);
-			// 	return null;
-			// }
-			index.list = next;
-		}
+		// if (index.have == index.gzip)
+		// {
+		// 	index.gzip <<= 1;
+		// 	next = (Point*)Realloc(index.list, (nuint)(sizeof(Point) * index.gzip));
+		// 	index.list = next;
+		// }
 
 		// fill in entry and increment how many we have
-		next = (Point*)(index.list) + index.have;
+		// next = (Point*)(index.list) + index.have;
 		next->bits = bits;
 		next->@in = @in;
 		next->@out = @out;
@@ -150,7 +131,8 @@ public static unsafe class Defined
 			Copy(window + WINSIZE - left, next->window, left);
 		if (left < WINSIZE)
 			Copy(window, next->window + left, WINSIZE - left);
-		index.have++;
+		// index.have++;
+		index.list.Add(*next);
 
 		// return list, possibly reallocated
 		return index;
@@ -273,18 +255,17 @@ public static unsafe class Defined
 
 			/* clean up and return index (release unused entries in list) */
 			inflateEnd(&strm);
-			index.list = (Point*)Realloc(index.list, (nuint)(sizeof(Point) * index.have));
-			index.gzip = gzip;
+			// index.list = (Point*)Realloc(index.list, (nuint)(sizeof(Point) * index.have));
+			// index.gzip = gzip;
 			index.length = totout;
 			built = index;
-			return index.have;
-
+			return index.list.Count;
 		}
 		catch
 		{
 			inflateEnd(&strm);
-			if (index != null)
-				FreeDeflateIndex(index);
+			// if (index != null)
+			// 	FreeDeflateIndex(index);
 			built = null;
 			return 0;
 		}
@@ -304,7 +285,7 @@ public static unsafe class Defined
 		int value = 0;
 		bool skip;
 		z_stream strm;
-		Point* here;
+		Point here;
 		byte* input = (byte*)Alloc(CHUNK);
 		byte* discard = (byte*)Alloc(WINSIZE);
 
@@ -313,10 +294,12 @@ public static unsafe class Defined
 			return 0;
 
 		/* find where in stream to start */
-		here = index.list;
-		value = index.have;
-		while (--value != 0 && here[1].@out <= offset)
-			here++;
+		// here = index.list;
+		var streamOffset = 0;
+		value = index.list.Count;
+		while (--value != 0 && index.list[streamOffset + 1].@out <= offset)
+			streamOffset++;
+		here = index.list[streamOffset];
 
 		/* initialize file and inflate state to start there */
 		strm.zalloc = null;
@@ -327,10 +310,10 @@ public static unsafe class Defined
 		ret = InflateInit2(&strm, -15);         /* raw inflate */
 		if (ret != ZResult.OK)
 			throw new ZException(ret);
-		ret = (ZResult)fseeko(@in, here->@in - (here->bits != 0 ? 1 : 0), (int)SeekOpt.SET);
+		ret = (ZResult)fseeko(@in, here.@in - (here.bits != 0 ? 1 : 0), (int)SeekOpt.SET);
 		if (ret == ZResult.ERRNO)
 			throw new ZException(ret);
-		if (here->bits != 0)
+		if (here.bits != 0)
 		{
 			ret = (ZResult)getc(@in);
 			if (ret == ZResult.ERRNO)
@@ -338,12 +321,12 @@ public static unsafe class Defined
 				ret = ferror(@in) != 0 ? ZResult.ERRNO : ZResult.DATA_ERROR;
 				throw new ZException(ret);
 			}
-			inflatePrime(&strm, here->bits, value >> (8 - here->bits));
+			inflatePrime(&strm, here.bits, value >> (8 - here.bits));
 		}
-		inflateSetDictionary(&strm, here->window, WINSIZE);
+		inflateSetDictionary(&strm, here.window, WINSIZE);
 
 		/* skip uncompressed bytes until offset reached, then satisfy request */
-		offset -= here->@out;
+		offset -= here.@out;
 		strm.avail_in = 0;
 		skip = true;                               /* while skipping to offset */
 		do
@@ -390,9 +373,9 @@ public static unsafe class Defined
 				if (ret == ZResult.STREAM_END)
 				{
 					/* the raw deflate stream has ended */
-					if (index.gzip == 0)
-						/* this is a zlib stream that has ended -- done */
-						break;
+					// if (index.gzip == 0)
+					// 	/* this is a zlib stream that has ended -- done */
+					// 	break;
 
 					/* near the end of a gzip member, which might be followed by
 					   another gzip member -- skip the gzip trailer and see if
