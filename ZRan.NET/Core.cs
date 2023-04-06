@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using static System.Runtime.InteropServices.NativeMemory;
 using static ParallelParsing.ZRan.NET.ExternalCalls;
 using static ParallelParsing.ZRan.NET.Constants;
+using static ParallelParsing.ZRan.NET.Compat;
 
 namespace ParallelParsing.ZRan.NET;
 
@@ -82,9 +83,26 @@ public unsafe class Index
 		// have = 0;
 		list = new List<Point>(8);
 	}
+
+	public void AddPoint(int bits, long @in, long @out, uint left, byte[] window)
+	{
+		Point next = new Point();
+
+		next.bits = bits;
+		next.@in = @in;
+		next.@out = @out;
+		next.window = new byte[WINSIZE];
+
+		if (left != 0)
+			Array.Copy(window, WINSIZE - left, next.window, 0, left);
+			
+		if (left < WINSIZE)
+			Array.Copy(window, 0, next.window, left, WINSIZE - left);
+		this.list.Add(next);
+	}
 }
 
-public unsafe struct Point
+public struct Point
 {
 	public long @out;
 	public long @in;
@@ -94,64 +112,6 @@ public unsafe struct Point
 
 public static unsafe class Defined
 {
-	public static ZResult InflateInit2(z_stream* strm, int windowBits)
-	{
-		fixed (char* ptr = ZLIB_VERSION)
-		{
-			return (ZResult)inflateInit2_(strm, windowBits, ptr, sizeof(z_stream));
-		}
-	}
-
-	public static unsafe ZResult InflateSetDictionary(
-		z_stream* strm, byte[] dictionary, uint dictLength)
-	{
-		fixed (byte* ptr = dictionary)
-		{
-			return inflateSetDictionary(strm, ptr, dictLength);
-		}
-	}
-
-
-	// public static void FreeDeflateIndex(Index index)
-	// {
-	// 	if (index != null)
-	// 	{
-	// 		Free(index.list);
-	// 	}
-	// }
-
-	public static Index AddPoint(Index index, int bits, long @in, long @out, uint left, byte[] window)
-	{
-		Point next = new Point();
-
-
-		// if list is full, make it bigger
-		// if (index.have == index.gzip)
-		// {
-		// 	index.gzip <<= 1;
-		// 	next = (Point*)Realloc(index.list, (nuint)(sizeof(Point) * index.gzip));
-		// 	index.list = next;
-		// }
-
-		// fill in entry and increment how many we have
-		// next = (Point*)(index.list) + index.have;
-		next.bits = bits;
-		next.@in = @in;
-		next.@out = @out;
-		next.window = new byte[WINSIZE];
-		if (left != 0)
-			Array.Copy(window, WINSIZE - left, next.window, 0, left);
-		// Copy(window + WINSIZE - left, next->window, left);
-		if (left < WINSIZE)
-			Array.Copy(window, 0, next.window, left, WINSIZE - left);
-		// Copy(window, next->window + left, WINSIZE - left);
-		// index.have++;
-		index.list.Add(next);
-
-		// return list, possibly reallocated
-		return index;
-	}
-
 	// Make one entire pass through a zlib or gzip compressed stream and build an
 	// index, with access points about every span bytes of uncompressed output.
 	// gzip files with multiple members are indexed in their entirety. span should
@@ -164,6 +124,12 @@ public static unsafe class Defined
 	{
 		z_stream strm;
 		Index index = new Index();    /* access points being generated */
+		byte[] input = new byte[CHUNK];
+		byte[] window = new byte[WINSIZE];
+
+		var hWindow = GCHandle.Alloc(window, GCHandleType.Pinned);
+		var hInput = GCHandle.Alloc(input, GCHandleType.Pinned);
+		var pInput = (byte*)hInput.AddrOfPinnedObject();
 
 		try
 		{
@@ -171,11 +137,6 @@ public static unsafe class Defined
 			int gzip = 0;               /* true if reading a gzip file */
 			long totin, totout;        /* our own total counters to avoid 4GB limit */
 			long last;                 /* totout value of last access point */
-			byte* input = (byte*)Alloc(CHUNK);
-			byte[] window = new byte[WINSIZE];
-
-			var hWindow = GCHandle.Alloc(
-				window, GCHandleType.Pinned);
 
 			/* initialize inflate */
 			strm.zalloc = null;
@@ -198,7 +159,7 @@ public static unsafe class Defined
 			do
 			{
 				/* get some compressed data from input file */
-				strm.avail_in = fread(input, 1, CHUNK, @in);
+				strm.avail_in = fread(pInput, 1, CHUNK, @in);
 				if (ferror(@in) != 0)
 				{
 					throw new ZException(ZResult.ERRNO);
@@ -207,7 +168,7 @@ public static unsafe class Defined
 				{
 					throw new ZException(ZResult.DATA_ERROR);
 				}
-				strm.next_in = input;
+				strm.next_in = pInput;
 
 				/* check for a gzip stream */
 				if (totin == 0 && strm.avail_in >= 3 &&
@@ -259,33 +220,26 @@ public static unsafe class Defined
 					if ((strm.data_type & 128) != 0 && (strm.data_type & 64) == 0 &&
 						(totout == 0 || totout - last > span))
 					{
-						index = AddPoint(index, strm.data_type & 7, totin,
-										 totout, strm.avail_out, window);
-						if (index == null)
-						{
-							throw new ZException(ZResult.MEM_ERROR);
-						}
+						index.AddPoint(strm.data_type & 7, totin, totout, strm.avail_out, window);
+						// if (index == null)
+						// {
+						// 	throw new ZException(ZResult.MEM_ERROR);
+						// }
 						last = totout;
 					}
 				} while (strm.avail_in != 0);
 			} while (ret != ZResult.STREAM_END);
 
-			/* clean up and return index (release unused entries in list) */
-			inflateEnd(&strm);
-			hWindow.Free();
-			// index.list = (Point*)Realloc(index.list, (nuint)(sizeof(Point) * index.have));
-			// index.gzip = gzip;
 			index.length = totout;
 			built = index;
 			return index.list.Count;
 		}
-		catch (ZException e)
+		finally
 		{
+			/* clean up and return index (release unused entries in list) */
 			inflateEnd(&strm);
-			// if (index != null)
-			// 	FreeDeflateIndex(index);
-			built = null;
-			throw e;
+			hWindow.Free();
+			hInput.Free();
 		}
 	}
 
@@ -297,18 +251,24 @@ public static unsafe class Defined
 	// the index was generated, since deflate_index_build() validated all of the
 	// input. deflate_index_extract() will return Z_ERRNO if there is an error on
 	// reading or seeking the input file.
-	public static int deflate_index_extract(void* @in, Index index, long offset, byte* buf, int len)
+	public static int deflate_index_extract(void* @in, Index index, long offset, byte[] buf, int len)
 	{
 		z_stream strm;
-		
+		byte[] input = new byte[CHUNK];
+		byte[] discard = new byte[WINSIZE];
+		var hInput = GCHandle.Alloc(input, GCHandleType.Pinned);
+		var hDiscard = GCHandle.Alloc(discard, GCHandleType.Pinned);
+		var hBuf = GCHandle.Alloc(buf, GCHandleType.Pinned);
+		var pInput = (byte*)hInput.AddrOfPinnedObject();
+		var pDiscard = (byte*)hInput.AddrOfPinnedObject();
+		var pBuf = (byte*)hBuf.AddrOfPinnedObject();
+
 		try
 		{
 			ZResult ret;
 			int value = 0;
 			bool skip;
 			Point here;
-			byte* input = (byte*)Alloc(CHUNK);
-			byte* discard = (byte*)Alloc(WINSIZE);
 
 			/* proceed only if something reasonable to do */
 			if (len < 0)
@@ -356,19 +316,19 @@ public static unsafe class Defined
 				if (offset > WINSIZE)
 				{             /* skip WINSIZE bytes */
 					strm.avail_out = WINSIZE;
-					strm.next_out = discard;
+					strm.next_out = pDiscard;
 					offset -= WINSIZE;
 				}
 				else if (offset > 0)
 				{              /* last skip */
 					strm.avail_out = (uint)offset;
-					strm.next_out = discard;
+					strm.next_out = pDiscard;
 					offset = 0;
 				}
 				else if (skip)
 				{                    /* at offset now */
 					strm.avail_out = (uint)len;
-					strm.next_out = buf;
+					strm.next_out = pBuf;
 					skip = false;                       /* only do this once */
 				}
 
@@ -377,7 +337,7 @@ public static unsafe class Defined
 				{
 					if (strm.avail_in == 0)
 					{
-						strm.avail_in = fread(input, 1, CHUNK, @in);
+						strm.avail_in = fread(pInput, 1, CHUNK, @in);
 						if (ferror(@in) != 0)
 						{
 							throw new ZException(ZResult.ERRNO);
@@ -386,7 +346,7 @@ public static unsafe class Defined
 						{
 							throw new ZException(ZResult.DATA_ERROR);
 						}
-						strm.next_in = input;
+						strm.next_in = pInput;
 					}
 					ret = inflate(&strm, ZFlush.NO_FLUSH);       /* normal inflate */
 					if (ret == ZResult.MEM_ERROR || ret == ZResult.DATA_ERROR || ret == ZResult.NEED_DICT)
@@ -424,7 +384,7 @@ public static unsafe class Defined
 						{
 							if (strm.avail_in == 0)
 							{
-								strm.avail_in = fread(input, 1, CHUNK, @in);
+								strm.avail_in = fread(pInput, 1, CHUNK, @in);
 								if (ferror(@in) != 0)
 								{
 									ret = ZResult.ERRNO;
@@ -435,7 +395,7 @@ public static unsafe class Defined
 									ret = ZResult.DATA_ERROR;
 									throw new ZException(ZResult.DATA_ERROR);
 								}
-								strm.next_in = input;
+								strm.next_in = pInput;
 							}
 							ret = inflate(&strm, ZFlush.BLOCK);
 							if (ret == ZResult.MEM_ERROR || ret == ZResult.DATA_ERROR)
@@ -469,6 +429,8 @@ public static unsafe class Defined
 		{
 			/* clean up and return the bytes read, or the negative error */
 			inflateEnd(&strm);
+			hInput.Free();
+			hDiscard.Free();
 		}
 	}
 }

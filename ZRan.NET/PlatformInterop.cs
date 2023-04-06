@@ -3,10 +3,12 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
+using static ParallelParsing.ZRan.NET.Constants;
+using static ParallelParsing.ZRan.NET.ExternalCalls;
 
 namespace ParallelParsing.ZRan.NET;
 
-public static class ExternalCalls
+internal static class ExternalCalls
 {
 	// [DllImport("libz.so", CharSet = CharSet.Ansi)]
 	// public static unsafe extern int deflateEnd(nint strm);
@@ -156,6 +158,26 @@ public unsafe struct z_stream
 // 	}
 
 // }
+
+public unsafe static class Compat
+{
+	public static ZResult InflateInit2(z_stream* strm, int windowBits)
+	{
+		fixed (char* ptr = ZLIB_VERSION)
+		{
+			return (ZResult)inflateInit2_(strm, windowBits, ptr, sizeof(z_stream));
+		}
+	}
+
+	public static unsafe ZResult InflateSetDictionary(
+		z_stream* strm, byte[] dictionary, uint dictLength)
+	{
+		fixed (byte* ptr = dictionary)
+		{
+			return inflateSetDictionary(strm, ptr, dictLength);
+		}
+	}
+}
 
 public unsafe class FixedArray<T> where T : unmanaged
 {
