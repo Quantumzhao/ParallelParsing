@@ -5,7 +5,7 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
 
-namespace ParallelParsing.GZTool.NET;
+namespace ParallelParsing.ZRan.NET;
 
 public enum ZResult
 {

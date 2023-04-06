@@ -3,10 +3,10 @@ using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using static System.Runtime.InteropServices.NativeMemory;
-using static ParallelParsing.GZTool.NET.ExternalCalls;
-using static ParallelParsing.GZTool.NET.Constants;
+using static ParallelParsing.ZRan.NET.ExternalCalls;
+using static ParallelParsing.ZRan.NET.Constants;
 
-namespace ParallelParsing.GZTool.NET;
+namespace ParallelParsing.ZRan.NET;
 
 // public unsafe class Point
 // {

@@ -1,7 +1,7 @@
 
 using System.Runtime.InteropServices;
-using ParallelParsing.GZTool.NET;
-using Index = ParallelParsing.GZTool.NET.Index;
+using ParallelParsing.ZRan.NET;
+using Index = ParallelParsing.ZRan.NET.Index;
 
 unsafe
 {
