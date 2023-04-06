@@ -65,15 +65,6 @@ public static class Constants
 	public const int EOF = -1;
 }
 
-// public class GenericException : Exception
-// {
-// 	public GenericException(string message) : base(message) { }
-// }
-
-// public class InvalidOptionException : Exception { }
-
-// public class ExitFileOverwrittenException : Exception { }
-
 public class ZException : Exception
 {
 	public ZResult Code { get; }
