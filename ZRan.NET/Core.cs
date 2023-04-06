@@ -8,23 +8,6 @@ using static ParallelParsing.GZTool.NET.Constants;
 
 namespace ParallelParsing.GZTool.NET;
 
-public record struct ActionOptions(
-	IndexAndExtractionOptions IndexAndExtractionOptions,
-	ulong Offset,
-	ulong LineNumberOffset,
-	ulong SpanBetween_Points,
-	bool DoesEndOnFirstProperGzipEof,
-	bool IsAlwaysCreateACompleteIndex,
-	int WaitingTime,
-	bool DoesWaitForFileCreation,
-	bool DoesExtendIndexWithLines,
-	ulong ExpectedFirstByte,
-	bool GzipStreamMayBeDamaged,
-	bool IsLazyGzipStreamPatchingAtEof,
-	ulong RangeNumberOfBytes,
-	ulong RangeNumberOfLines
-);
-
 // public unsafe class Point
 // {
 // 	// internal point* PtrPoint;
@@ -458,32 +441,4 @@ public static unsafe class Defined
 		inflateEnd(&strm);
 		return value;
 	}
-
-
-	// public ZResult BuildDeflateIndex(FileStream @in, long span, out Index? built)
-	// {
-	// 	ZResult ret;
-	// 	// our own total counters to avoid 4GB limit
-	// 	long totin, totout;
-	// 	// totout value of last access point
-	// 	long last;
-	// 	// access points being generated
-	// 	Index index = new Index();
-	// 	ZStream strm = new ZStream();
-	// 	byte[] input = new byte[..CHUNK];
-	// 	byte[] window = new byte[.WINSIZE];
-
-	// 	ret = InflateInit2(strm, 47);
-	// 	if (ret != ZResult.OK)
-	// 	{
-	// 		built = null;
-	// 		return ret;
-	// 	}
-
-	// 	totin = totout = last = 0;
-	// 	do
-	// 	{
-
-	// 	} while (true);
-	// }
 }

@@ -85,42 +85,6 @@ public static class ExternalCalls
 
 	[DllImport("/usr/lib/x86_64-linux-gnu/libc.so.6", CharSet = CharSet.Ansi)]
 	public static unsafe extern void* fopen(char* file_name, char* modes);
-
-	// [DllImport("gztool", CharSet = CharSet.Ansi)]
-	// public static unsafe extern EXIT_RETURNED_VALUES action_create_index(
-	// 	[MarshalAs(UnmanagedType.LPStr)] char* file_name,
-	// 	index** index,
-	// 	[MarshalAs(UnmanagedType.LPStr)] char* index_filename,
-	// 	IndexAndExtractionOptions indx_n_extraction_opts,
-	// 	UInt64 offset,
-	// 	UInt64 line_number_offset,
-	// 	UInt64 span_between_points,
-	// 	Int32 end_on_first_proper_gzip_eof,
-	// 	Int32 always_create_a_complete_index,
-	// 	Int32 waiting_time,
-	// 	Int32 wait_for_file_creation,
-	// 	Int32 extend_index_with_lines,
-	// 	UInt64 expected_first_byte,
-	// 	Int32 gzip_stream_may_be_damaged,
-	// 	[MarshalAs(UnmanagedType.I1)] bool lazy_gzip_stream_patching_at_eof,
-	// 	UInt64 range_number_of_bytes,
-	// 	UInt64 range_number_of_lines
-	// );
-
-	// [DllImport("gztool")]
-	// public static unsafe extern int serialize_index_to_file(
-	// 	IntPtr output_file,
-	// 	index* index,
-	// 	UInt64 index_last_written_point
-	// );
-
-	// [DllImport("gztool", CharSet = CharSet.Ansi)]
-	// public static unsafe extern int deserialize_index_from_file(
-	// 	IntPtr input_file, 
-	// 	int load_windows, 
-	// 	[MarshalAs(UnmanagedType.LPStr)] char* file_name,
-	// 	int extern_index_with_lines
-	// );
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -191,57 +155,6 @@ public unsafe struct z_stream
 // 		return (IntPtr)strm._Hndl;
 // 	}
 
-// }
-
-// public static class Defined
-// {
-	// private const string ZLIB_VERSION = "1.2.11";
-	
-	// public unsafe static ZResult DeflateInit(out ZStream strm, int level)
-	// {
-	// 	var s = Marshal.StringToHGlobalAnsi(ZLIB_VERSION);
-	// 	z_stream* ret = default;
-	// 	var res = (ZResult)ExternalCalls.deflateInit_((IntPtr)ret, level, s, (int)sizeof(z_stream));
-	// 	strm = new ZStream(ret);
-	// 	return res;
-	// }
-
-	// public unsafe static ZResult DeflateEnd(in ZStream strm)
-	// {
-	// 	z_stream* res = default;
-	// 	var ret = (ZResult)ExternalCalls.deflateEnd((IntPtr)strm);
-	// 	return ret;
-	// }
-
-	// public unsafe static EXIT_RETURNED_VALUES Decompress(
-	// 	char* file_name,
-	// 	UInt64 extract_from_byte,
-	// 	char* index_filename)
-	// {
-	// 	var index_filename_indicated = 1;
-		
-
-		// return ExternalCalls.action_create_index(
-		// 	file_name,
-		// 	index_filename,
-		// 	IndexAndExtractionOptions.ExtractFromByte,
-		// 	offset: extract_from_byte, 
-		// 	line_number_offset,
-		// 	span_between_points,
-		// 	end_on_first_proper_gzip_eof,
-		// 	always_create_a_complete_index,
-		// 	waiting_time: 4,
-		// 	wait_for_file_creation,
-		// 	extend_index_with_lines,
-		// 	expected_first_byte,
-		// 	gzip_stream_may_be_damaged,
-		// 	lazy_gzip_stream_patching_at_eof,
-		// 	range_number_of_bytes,
-		// 	range_number_of_lines
-		// );
-
-	// 	throw new NotImplementedException();
-	// }
 // }
 
 public unsafe class FixedArray<T> where T : unmanaged
