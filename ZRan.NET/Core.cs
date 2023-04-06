@@ -69,12 +69,19 @@ namespace ParallelParsing.ZRan.NET;
 // 	public List<Point> List = new List<Point>();
 // }
 
-public unsafe struct Index
+public unsafe class Index
 {
 	public int have;
 	public int gzip;
 	public long length;
 	public Point* list;
+
+	public Index()
+	{
+		gzip = 8;
+		have = 0;
+		list = (Point*)Alloc((nuint)sizeof(Point) << 3);
+	}
 }
 
 public unsafe struct Point
@@ -93,48 +100,48 @@ public static unsafe class Defined
 		return (ZResult)inflateInit2_(strm, windowBits, version, sizeof(z_stream));
 	}
 
-	public static void FreeDeflateIndex(Index* index)
+	public static void FreeDeflateIndex(Index index)
 	{
 		if (index != null)
 		{
-			Free(index->list);
-			Free(index);
+			Free(index.list);
+			// Free(index);
 		}
 	}
 
-	public static Index* AddPoint(Index* index, int bits, long @in, long @out, uint left, byte* window)
+	public static Index AddPoint(Index index, int bits, long @in, long @out, uint left, byte* window)
 	{
 		Point* next;
 
-		if (index == null)
-		{
-			index = (Index*)Alloc((nuint)sizeof(Index));
-			if (index == null) return null;
-			index->list = (Point*)Alloc((nuint)sizeof(Point) << 3);
-			if (index->list == null)
-			{
-				Free(index);
-				return null;
-			}
-			index->gzip = 8;
-			index->have = 0;
-		}
+		// if (index == null)
+		// {
+		// 	index = (Index*)Alloc((nuint)sizeof(Index));
+		// 	if (index == null) return null;
+		// 	index.list = (Point*)Alloc((nuint)sizeof(Point) << 3);
+		// 	if (index.list == null)
+		// 	{
+		// 		Free(index);
+		// 		return null;
+		// 	}
+		// 	index.gzip = 8;
+		// 	index.have = 0;
+		// }
 
 		// if list is full, make it bigger
-		else if (index->have == index->gzip)
+		if (index.have == index.gzip)
 		{
-			index->gzip <<= 1;
-			next = (Point*)Realloc(index->list, (nuint)(sizeof(Point) * index->gzip));
-			if (next == null)
-			{
-				FreeDeflateIndex(index);
-				return null;
-			}
-			index->list = next;
+			index.gzip <<= 1;
+			next = (Point*)Realloc(index.list, (nuint)(sizeof(Point) * index.gzip));
+			// if (next == null)
+			// {
+			// 	FreeDeflateIndex(index);
+			// 	return null;
+			// }
+			index.list = next;
 		}
 
 		// fill in entry and increment how many we have
-		next = (Point*)(index->list) + index->have;
+		next = (Point*)(index.list) + index.have;
 		next->bits = bits;
 		next->@in = @in;
 		next->@out = @out;
@@ -143,7 +150,7 @@ public static unsafe class Defined
 			Copy(window + WINSIZE - left, next->window, left);
 		if (left < WINSIZE)
 			Copy(window, next->window + left, WINSIZE - left);
-		index->have++;
+		index.have++;
 
 		// return list, possibly reallocated
 		return index;
@@ -157,124 +164,129 @@ public static unsafe class Defined
 	// is the number of access points on success (>= 1), Z_MEM_ERROR for out of
 	// memory, Z_DATA_ERROR for an error in the input file, or Z_ERRNO for a file
 	// read error. On success, *built points to the resulting index.
-	public static ZReturn deflate_index_build(void* @in, long span, Index** built)
+	public static int deflate_index_build(void* @in, long span, out Index? built)
 	{
-		ZResult ret;
-		int gzip = 0;               /* true if reading a gzip file */
-		long totin, totout;        /* our own total counters to avoid 4GB limit */
-		long last;                 /* totout value of last access point */
-		Index* index;    /* access points being generated */
 		z_stream strm;
-		byte* input = (byte*)Alloc(CHUNK);
-		byte* window = (byte*)Alloc(WINSIZE);
+		Index index = new Index();    /* access points being generated */
 
-		/* initialize inflate */
-		strm.zalloc = null;
-		strm.zfree = null;
-		strm.opaque = null;
-		strm.avail_in = 0;
-		strm.next_in = null;
-		ret = InflateInit2(&strm, 47);      /* automatic zlib or gzip decoding */
-		if (ret != ZResult.OK)
-			return ret;
-
-		/* inflate the input, maintain a sliding window, and build an index -- this
-		   also validates the integrity of the compressed data using the check
-		   information in the gzip or zlib stream */
-		totin = totout = last = 0;
-		index = null;               /* will be allocated by first addpoint() */
-		strm.avail_out = 0;
-		do
+		try
 		{
-			/* get some compressed data from input file */
-			strm.avail_in = fread(input, 1, CHUNK, @in);
-			if (ferror(@in) != 0)
-			{
-				ret = ZResult.ERRNO;
-				goto deflate_index_build_error;
-			}
-			if (strm.avail_in == 0)
-			{
-				ret = ZResult.DATA_ERROR;
-				goto deflate_index_build_error;
-			}
-			strm.next_in = input;
+			ZResult ret;
+			int gzip = 0;               /* true if reading a gzip file */
+			long totin, totout;        /* our own total counters to avoid 4GB limit */
+			long last;                 /* totout value of last access point */
+			byte* input = (byte*)Alloc(CHUNK);
+			byte* window = (byte*)Alloc(WINSIZE);
 
-			/* check for a gzip stream */
-			if (totin == 0 && strm.avail_in >= 3 &&
-				input[0] == 31 && input[1] == 139 && input[2] == 8)
-				gzip = 1;
+			/* initialize inflate */
+			strm.zalloc = null;
+			strm.zfree = null;
+			strm.opaque = null;
+			strm.avail_in = 0;
+			strm.next_in = null;
+			ret = InflateInit2(&strm, 47);      /* automatic zlib or gzip decoding */
+			if (ret != ZResult.OK)
+			{
+				throw new ZException(ret);
+			}
 
-			/* process all of that, or until end of stream */
+			/* inflate the input, maintain a sliding window, and build an index -- this
+			   also validates the integrity of the compressed data using the check
+			   information in the gzip or zlib stream */
+			totin = totout = last = 0;
+			// index = null;               /* will be allocated by first addpoint() */
+			strm.avail_out = 0;
 			do
 			{
-				/* reset sliding window if necessary */
-				if (strm.avail_out == 0)
+				/* get some compressed data from input file */
+				strm.avail_in = fread(input, 1, CHUNK, @in);
+				if (ferror(@in) != 0)
 				{
-					strm.avail_out = WINSIZE;
-					strm.next_out = window;
+					throw new ZException(ZResult.ERRNO);
 				}
-
-				/* inflate until out of input, output, or at end of block --
-				   update the total input and output counters */
-				totin += strm.avail_in;
-				totout += strm.avail_out;
-				ret = inflate(&strm, ZFlush.BLOCK);      /* return at end of block */
-				totin -= strm.avail_in;
-				totout -= strm.avail_out;
-				if (ret == ZResult.NEED_DICT)
-					ret = ZResult.DATA_ERROR;
-				if (ret == ZResult.MEM_ERROR || ret == ZResult.DATA_ERROR)
-					goto deflate_index_build_error;
-				if (ret == ZResult.STREAM_END)
+				if (strm.avail_in == 0)
 				{
-					if (gzip != 0 && (strm.avail_in != 0 || ungetc(getc(@in), @in) != EOF))
+					throw new ZException(ZResult.DATA_ERROR);
+				}
+				strm.next_in = input;
+
+				/* check for a gzip stream */
+				if (totin == 0 && strm.avail_in >= 3 &&
+					input[0] == 31 && input[1] == 139 && input[2] == 8)
+					gzip = 1;
+
+				/* process all of that, or until end of stream */
+				do
+				{
+					/* reset sliding window if necessary */
+					if (strm.avail_out == 0)
 					{
-						ret = inflateReset(&strm);
-						if (ret != ZResult.OK)
-							goto deflate_index_build_error;
-						continue;
+						strm.avail_out = WINSIZE;
+						strm.next_out = window;
 					}
-					break;
-				}
 
-				/* if at end of block, consider adding an index entry (note that if
-				   data_type indicates an end-of-block, then all of the
-				   uncompressed data from that block has been delivered, and none
-				   of the compressed data after that block has been consumed,
-				   except for up to seven bits) -- the totout == 0 provides an
-				   entry point after the zlib or gzip header, and assures that the
-				   index always has at least one access point; we avoid creating an
-				   access point after the last block by checking bit 6 of data_type
-				 */
-				if ((strm.data_type & 128) != 0 && (strm.data_type & 64) == 0 &&
-					(totout == 0 || totout - last > span))
-				{
-					index = AddPoint(index, strm.data_type & 7, totin,
-									 totout, strm.avail_out, window);
-					if (index == null)
+					/* inflate until out of input, output, or at end of block --
+					   update the total input and output counters */
+					totin += strm.avail_in;
+					totout += strm.avail_out;
+					ret = inflate(&strm, ZFlush.BLOCK);      /* return at end of block */
+					totin -= strm.avail_in;
+					totout -= strm.avail_out;
+					if (ret == ZResult.NEED_DICT || 
+						ret == ZResult.MEM_ERROR || 
+						ret == ZResult.DATA_ERROR)
+						throw new ZException(ret);
+					if (ret == ZResult.STREAM_END)
 					{
-						ret = ZResult.MEM_ERROR;
-						goto deflate_index_build_error;
+						if (gzip != 0 && (strm.avail_in != 0 || ungetc(getc(@in), @in) != EOF))
+						{
+							ret = inflateReset(&strm);
+							if (ret != ZResult.OK)
+								throw new ZException(ret);
+							continue;
+						}
+						break;
 					}
-					last = totout;
-				}
-			} while (strm.avail_in != 0);
-		} while (ret != ZResult.STREAM_END);
 
-		/* clean up and return index (release unused entries in list) */
-		inflateEnd(&strm);
-		index->list = (Point*)Realloc(index->list, (nuint)(sizeof(Point) * index->have));
-		index->gzip = gzip;
-		index->length = totout;
-		*built = index;
-		return index->have;
+					/* if at end of block, consider adding an index entry (note that if
+					   data_type indicates an end-of-block, then all of the
+					   uncompressed data from that block has been delivered, and none
+					   of the compressed data after that block has been consumed,
+					   except for up to seven bits) -- the totout == 0 provides an
+					   entry point after the zlib or gzip header, and assures that the
+					   index always has at least one access point; we avoid creating an
+					   access point after the last block by checking bit 6 of data_type
+					 */
+					if ((strm.data_type & 128) != 0 && (strm.data_type & 64) == 0 &&
+						(totout == 0 || totout - last > span))
+					{
+						index = AddPoint(index, strm.data_type & 7, totin,
+										 totout, strm.avail_out, window);
+						if (index == null)
+						{
+							throw new ZException(ZResult.MEM_ERROR);
+						}
+						last = totout;
+					}
+				} while (strm.avail_in != 0);
+			} while (ret != ZResult.STREAM_END);
 
-	/* return error */
-	deflate_index_build_error:
-		inflateEnd(&strm);
-		FreeDeflateIndex(index);
-		return ret;
+			/* clean up and return index (release unused entries in list) */
+			inflateEnd(&strm);
+			index.list = (Point*)Realloc(index.list, (nuint)(sizeof(Point) * index.have));
+			index.gzip = gzip;
+			index.length = totout;
+			built = index;
+			return index.have;
+
+		}
+		finally
+		{
+			inflateEnd(&strm);
+			if (index != null)
+				FreeDeflateIndex(index);
+			built = null;
+		}
 	}
 
 	// Use the index to read len bytes from offset into buf. Return bytes read or
@@ -285,7 +297,7 @@ public static unsafe class Defined
 	// the index was generated, since deflate_index_build() validated all of the
 	// input. deflate_index_extract() will return Z_ERRNO if there is an error on
 	// reading or seeking the input file.
-	public static ZReturn deflate_index_extract(void* @in, Index* index, long offset, byte* buf, int len)
+	public static int deflate_index_extract(void* @in, Index index, long offset, byte* buf, int len)
 	{
 		ZResult ret;
 		int value = 0;
@@ -300,8 +312,8 @@ public static unsafe class Defined
 			return 0;
 
 		/* find where in stream to start */
-		here = index->list;
-		value = index->have;
+		here = index.list;
+		value = index.have;
 		while (--value != 0 && here[1].@out <= offset)
 			here++;
 
@@ -313,17 +325,17 @@ public static unsafe class Defined
 		strm.next_in = null;
 		ret = InflateInit2(&strm, -15);         /* raw inflate */
 		if (ret != ZResult.OK)
-			return ret;
+			throw new ZException(ret);
 		ret = (ZResult)fseeko(@in, here->@in - (here->bits != 0 ? 1 : 0), (int)SeekOpt.SET);
 		if (ret == ZResult.ERRNO)
-			goto deflate_index_extract_ret;
+			throw new ZException(ret);
 		if (here->bits != 0)
 		{
 			ret = (ZResult)getc(@in);
 			if (ret == ZResult.ERRNO)
 			{
 				ret = ferror(@in) != 0 ? ZResult.ERRNO : ZResult.DATA_ERROR;
-				goto deflate_index_extract_ret;
+				throw new ZException(ret);
 			}
 			inflatePrime(&strm, here->bits, value >> (8 - here->bits));
 		}
@@ -363,25 +375,21 @@ public static unsafe class Defined
 					strm.avail_in = fread(input, 1, CHUNK, @in);
 					if (ferror(@in) != 0)
 					{
-						ret = ZResult.ERRNO;
-						goto deflate_index_extract_ret;
+						throw new ZException(ZResult.ERRNO);
 					}
 					if (strm.avail_in == 0)
 					{
-						ret = ZResult.DATA_ERROR;
-						goto deflate_index_extract_ret;
+						throw new ZException(ZResult.DATA_ERROR);
 					}
 					strm.next_in = input;
 				}
 				ret = inflate(&strm, ZFlush.NO_FLUSH);       /* normal inflate */
-				if (ret == ZResult.NEED_DICT)
-					ret = ZResult.DATA_ERROR;
-				if (ret == ZResult.MEM_ERROR || ret == ZResult.DATA_ERROR)
-					goto deflate_index_extract_ret;
+				if (ret == ZResult.MEM_ERROR || ret == ZResult.DATA_ERROR || ret == ZResult.NEED_DICT)
+					throw new ZException(ret);
 				if (ret == ZResult.STREAM_END)
 				{
 					/* the raw deflate stream has ended */
-					if (index->gzip == 0)
+					if (index.gzip == 0)
 						/* this is a zlib stream that has ended -- done */
 						break;
 
@@ -406,7 +414,7 @@ public static unsafe class Defined
 					   validate and skip the gzip header */
 					ret = inflateReset2(&strm, 31);
 					if (ret != ZResult.OK)
-						goto deflate_index_extract_ret;
+						throw new ZException(ret);
 					do
 					{
 						if (strm.avail_in == 0)
@@ -415,25 +423,25 @@ public static unsafe class Defined
 							if (ferror(@in) != 0)
 							{
 								ret = ZResult.ERRNO;
-								goto deflate_index_extract_ret;
+								throw new ZException(ZResult.ERRNO);
 							}
 							if (strm.avail_in == 0)
 							{
 								ret = ZResult.DATA_ERROR;
-								goto deflate_index_extract_ret;
+								throw new ZException(ZResult.DATA_ERROR);
 							}
 							strm.next_in = input;
 						}
 						ret = inflate(&strm, ZFlush.BLOCK);
 						if (ret == ZResult.MEM_ERROR || ret == ZResult.DATA_ERROR)
-							goto deflate_index_extract_ret;
+							throw new ZException(ret);
 					} while ((strm.data_type & 128) == 0);
 
 					/* set up to continue decompression of the raw deflate stream
 					   that follows the gzip header */
 					ret = inflateReset2(&strm, -15);
 					if (ret != ZResult.OK)
-						goto deflate_index_extract_ret;
+						throw new ZException(ret);
 				}
 
 				/* continue to process the available input before reading more */
@@ -451,7 +459,6 @@ public static unsafe class Defined
 		value = skip ? 0 : len - (int)strm.avail_out;
 
 	/* clean up and return the bytes read, or the negative error */
-	deflate_index_extract_ret:
 		inflateEnd(&strm);
 		return value;
 	}

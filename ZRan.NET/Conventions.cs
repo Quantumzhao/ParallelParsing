@@ -49,17 +49,6 @@ public enum SeekOpt
 	END
 }
 
-public struct ZReturn
-{
-	ZResult Res;
-	int Val;
-
-	public static implicit operator ZReturn(int val) => new ZReturn { Val = val };
-	public static implicit operator ZReturn(ZResult res) => new ZReturn { Res = res };
-	public static implicit operator ZResult(ZReturn ret) => ret.Res;
-	public int ToInt() => Val;
-}
-
 public static class Constants
 {
 	public const string ZLIB_VERSION = "1.2.11";
@@ -76,14 +65,21 @@ public static class Constants
 	public const int EOF = -1;
 }
 
-[Obsolete]
-public class GenericException : Exception
+// public class GenericException : Exception
+// {
+// 	public GenericException(string message) : base(message) { }
+// }
+
+// public class InvalidOptionException : Exception { }
+
+// public class ExitFileOverwrittenException : Exception { }
+
+public class ZException : Exception
 {
-	public GenericException(string message) : base(message) { }
+	public ZResult Code { get; }
+
+	public ZException(ZResult code)
+	{
+		Code = code;
+	}
 }
-
-[Obsolete]
-public class InvalidOptionException : Exception { }
-
-[Obsolete]
-public class ExitFileOverwrittenException : Exception { }
