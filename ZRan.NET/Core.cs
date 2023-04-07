@@ -37,9 +37,9 @@ public unsafe class Index
 public struct Point
 {
 	// corresponding offset in uncompressed data
-	public readonly long @out;
+	public readonly long output;
 	// offset in input file of first full byte
-	public readonly long @in;
+	public readonly long input;
 	// number of bits (1-7) from byte at in-1, or 0
 	public readonly int bits;
 	// preceding 32K of uncompressed data
@@ -47,8 +47,8 @@ public struct Point
 
 	public Point(long @out, long @in, int bits)
 	{
-		this.@out = @out;
-		this.@in = @in;
+		this.output = @out;
+		this.input = @in;
 		this.bits = bits;
 	}
 }
@@ -63,7 +63,7 @@ public static unsafe class Core
 	// is the number of access points on success (>= 1), Z_MEM_ERROR for out of
 	// memory, Z_DATA_ERROR for an error in the input file, or Z_ERRNO for a file
 	// read error. On success, *built points to the resulting index.
-	public static int deflate_index_build(void* @in, long span, out Index built)
+	public static int deflate_index_build(FileStream file, long span, out Index built)
 	{
 		z_stream strm;
 		Index index = new Index();
@@ -103,11 +103,11 @@ public static unsafe class Core
 			do
 			{
 				// get some compressed data from input file
-				strm.avail_in = fread(pInput, 1, CHUNK, @in);
-				if (ferror(@in) != 0)
-				{
-					throw new ZException(ZResult.ERRNO);
-				}
+				strm.avail_in = (uint)file.Read(input, 0, (int)CHUNK);
+				// if (ferror(@in) != 0)
+				// {
+				// 	throw new ZException(ZResult.ERRNO);
+				// }
 				if (strm.avail_in == 0)
 				{
 					throw new ZException(ZResult.DATA_ERROR);
@@ -138,7 +138,7 @@ public static unsafe class Core
 						throw new ZException(ret);
 					if (ret == ZResult.STREAM_END)
 					{
-						if (strm.avail_in != 0 || ungetc(getc(@in), @in) != EOF)
+						if (strm.avail_in != 0 || file.Position != file.Length)
 						{
 							ret = inflateReset(&strm);
 							if (ret != ZResult.OK)
@@ -186,7 +186,8 @@ public static unsafe class Core
 	// the index was generated, since deflate_index_build() validated all of the
 	// input. deflate_index_extract() will return Z_ERRNO if there is an error on
 	// reading or seeking the input file.
-	public static int deflate_index_extract(void* @in, Index index, long offset, byte[] buf, int len)
+	public static int deflate_index_extract(
+		FileStream file, Index index, long offset, byte[] buf, int len)
 	{
 		// no need to pin (I guess); it's an unmanaged struct on stack
 		z_stream strm;
@@ -213,7 +214,7 @@ public static unsafe class Core
 
 			// find where in stream to start
 			value = index.list.Count;
-			while (--value != 0 && index.list[streamOffset + 1].@out <= offset)
+			while (--value != 0 && index.list[streamOffset + 1].output <= offset)
 				streamOffset++;
 			here = index.list[streamOffset];
 
@@ -227,23 +228,25 @@ public static unsafe class Core
 			ret = InflateInit2(&strm, -15);
 			if (ret != ZResult.OK)
 				throw new ZException(ret);
-			ret = (ZResult)fseeko(@in, here.@in - (here.bits != 0 ? 1 : 0), (int)SeekOpt.SET);
-			if (ret == ZResult.ERRNO)
-				throw new ZException(ret);
+			file.Position = file.Seek(here.input - (here.bits != 0 ? 1 : 0), SeekOrigin.Begin);
+			// ret = (ZResult)fseeko(@in, here.@in - (here.bits != 0 ? 1 : 0), (int)SeekOpt.SET);
+			// if (ret == ZResult.ERRNO)
+			// 	throw new ZException(ret);
 			if (here.bits != 0)
 			{
-				ret = (ZResult)getc(@in);
+				ret = (ZResult)file.ReadByte();
+				// ret = (ZResult)getc(@in);
 				if (ret == ZResult.ERRNO)
 				{
-					ret = ferror(@in) != 0 ? ZResult.ERRNO : ZResult.DATA_ERROR;
-					throw new ZException(ret);
+					// ret = ferror(@in) != 0 ? ZResult.ERRNO : ZResult.DATA_ERROR;
+					throw new ZException(ZResult.DATA_ERROR);
 				}
 				inflatePrime(&strm, here.bits, value >> (8 - here.bits));
 			}
 			InflateSetDictionary(&strm, here.window, WINSIZE);
 
 			// skip uncompressed bytes until offset reached, then satisfy request
-			offset -= here.@out;
+			offset -= here.output;
 			strm.avail_in = 0;
 			// while skipping to offset
 			skip = true;
@@ -277,11 +280,11 @@ public static unsafe class Core
 				{
 					if (strm.avail_in == 0)
 					{
-						strm.avail_in = fread(pInput, 1, CHUNK, @in);
-						if (ferror(@in) != 0)
-						{
-							throw new ZException(ZResult.ERRNO);
-						}
+						strm.avail_in = (uint)file.Read(input, 0, (int)CHUNK);
+						// if (ferror(@in) != 0)
+						// {
+						// 	throw new ZException(ZResult.ERRNO);
+						// }
 						if (strm.avail_in == 0)
 						{
 							throw new ZException(ZResult.DATA_ERROR);
@@ -299,7 +302,8 @@ public static unsafe class Core
 						// there is more input after it
 						if (strm.avail_in < 8)
 						{
-							fseeko(@in, 8 - strm.avail_in, (int)SeekOpt.CUR);
+							file.Position = file.Seek(8 - strm.avail_in, SeekOrigin.Current);
+							//fseeko(@in, 8 - strm.avail_in, (int)SeekOpt.CUR);
 							strm.avail_in = 0;
 						}
 						else
@@ -307,7 +311,8 @@ public static unsafe class Core
 							strm.avail_in -= 8;
 							strm.next_in += 8;
 						}
-						if (strm.avail_in == 0 && ungetc(getc(@in), @in) == EOF)
+						
+						if (strm.avail_in == 0 && file.Position == file.Length)
 							// the input ended after the gzip trailer -- done
 							break;
 
@@ -320,12 +325,12 @@ public static unsafe class Core
 						{
 							if (strm.avail_in == 0)
 							{
-								strm.avail_in = fread(pInput, 1, CHUNK, @in);
-								if (ferror(@in) != 0)
-								{
-									ret = ZResult.ERRNO;
-									throw new ZException(ZResult.ERRNO);
-								}
+								strm.avail_in = (uint)file.Read(input, 0, (int)CHUNK);
+								// if (ferror(@in) != 0)
+								// {
+								// 	ret = ZResult.ERRNO;
+								// 	throw new ZException(ZResult.ERRNO);
+								// }
 								if (strm.avail_in == 0)
 								{
 									ret = ZResult.DATA_ERROR;

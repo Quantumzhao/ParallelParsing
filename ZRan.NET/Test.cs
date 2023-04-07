@@ -1,3 +1,4 @@
+using System.IO;
 
 using System.Runtime.InteropServices;
 using System.Text;
@@ -6,9 +7,10 @@ using Index = ParallelParsing.ZRan.NET.Index;
 
 unsafe
 {
-	var fileName = Marshal.StringToHGlobalAnsi("../Gzipped_FASTQ_Files/SRR11192680.fastq.gz");
+	var fileName = "../Gzipped_FASTQ_Files/SRR11192680.fastq.gz";
 	var modes = Marshal.StringToHGlobalAnsi("rb");
-	void* file = ExternalCalls.fopen((char*)fileName, (char*)modes);
+	using var file = File.OpenRead(fileName);
+	// var file = ExternalCalls.fopen((char*)fileName, (char*)modes);
 	var len = Core.deflate_index_build(file, Constants.SPAN, out var index);
 	// Console.WriteLine(len);
 
@@ -20,5 +22,5 @@ unsafe
 	Console.WriteLine(Encoding.ASCII.GetString(buf));
 	// if (index != null)
 	// 	Defined.FreeDeflateIndex(index);
-	ExternalCalls.fclose(file);
+	// ExternalCalls.fclose(file);
 }
