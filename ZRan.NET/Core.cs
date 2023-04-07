@@ -3,7 +3,7 @@ using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using static System.Runtime.InteropServices.NativeMemory;
-using static ParallelParsing.ZRan.NET.ExternalCalls;
+using static ParallelParsing.ZRan.NET.libz;
 using static ParallelParsing.ZRan.NET.Constants;
 using static ParallelParsing.ZRan.NET.Compat;
 
@@ -55,15 +55,19 @@ public struct Point
 
 public static unsafe class Core
 {
-	// Make one entire pass through a zlib or gzip compressed stream and build an
-	// index, with access points about every span bytes of uncompressed output.
-	// gzip files with multiple members are indexed in their entirety. span should
-	// be chosen to balance the speed of random access against the memory
-	// requirements of the list, about 32K bytes per access point. The return value
-	// is the number of access points on success (>= 1), Z_MEM_ERROR for out of
-	// memory, Z_DATA_ERROR for an error in the input file, or Z_ERRNO for a file
-	// read error. On success, *built points to the resulting index.
-	public static int deflate_index_build(FileStream file, long span, out Index built)
+	/// <summary>
+	/// Make one entire pass through a zlib or gzip compressed stream and build an
+	/// index, with access points about every span bytes of uncompressed output.
+	/// gzip files with multiple members are indexed in their entirety. 
+	/// </summary>
+	/// <param name="file"></param>
+	/// <param name="span">
+	/// span should be chosen to balance the speed of random access against the memory 
+	/// requirements of the list, about 32K bytes per access point. 
+	/// </param>
+	/// <param name="built"></param>
+	/// <returns></returns>
+	public static Index BuildDeflateIndex(FileStream file, long span)
 	{
 		z_stream strm;
 		Index index = new Index();
@@ -166,8 +170,7 @@ public static unsafe class Core
 			} while (ret != ZResult.STREAM_END);
 
 			index.length = totout;
-			built = index;
-			return index.list.Count;
+			return index;
 		}
 		finally
 		{
@@ -178,15 +181,29 @@ public static unsafe class Core
 		}
 	}
 
-	// Use the index to read len bytes from offset into buf. Return bytes read or
-	// negative for error (Z_DATA_ERROR or Z_MEM_ERROR). If data is requested past
-	// the end of the uncompressed data, then deflate_index_extract() will return a
-	// value less than len, indicating how much was actually read into buf. This
-	// function should not return a data error unless the file was modified since
-	// the index was generated, since deflate_index_build() validated all of the
-	// input. deflate_index_extract() will return Z_ERRNO if there is an error on
-	// reading or seeking the input file.
-	public static int deflate_index_extract(
+	/// <summary>
+	/// Use the index to read len bytes from offset into buf. 
+	/// </summary>
+	/// <param name="file"></param>
+	/// <param name="index"></param>
+	/// <param name="offset">
+	/// starting from `offset` of bytes
+	/// </param>
+	/// <param name="buf"></param>
+	/// <param name="len">
+	/// count of bytes
+	/// </param>
+	/// <returns>
+	/// bytes read. 
+	/// If data is requested past
+	/// the end of the uncompressed data, then deflate_index_extract() will return a
+	/// value less than len, indicating how much was actually read into buf. This
+	/// function should not throw a data error unless the file was modified since
+	/// the index was generated, since deflate_index_build() validated all of the
+	/// input. deflate_index_extract() will return Z_ERRNO if there is an error on
+	/// reading or seeking the input file.
+	/// </returns>
+	public static int ExtractDeflateIndex(
 		FileStream file, Index index, long offset, byte[] buf, int len)
 	{
 		// no need to pin (I guess); it's an unmanaged struct on stack

@@ -4,33 +4,12 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using static ParallelParsing.ZRan.NET.Constants;
-using static ParallelParsing.ZRan.NET.ExternalCalls;
+using static ParallelParsing.ZRan.NET.libz;
 
 namespace ParallelParsing.ZRan.NET;
 
-internal static class ExternalCalls
+internal static class libz
 {
-	// [DllImport("libz.so", CharSet = CharSet.Ansi)]
-	// public static unsafe extern int deflateEnd(nint strm);
-
-	// [DllImport("libz.so", CharSet = CharSet.Ansi)]
-	// public static unsafe extern int deflate(IntPtr strm, int flush);
-
-	// [DllImport("libz.so", CharSet = CharSet.Ansi)]
-	// public static unsafe extern int deflateInit_(
-	// 	IntPtr strm, int level, IntPtr version, int stream_size);
-
-	// [DllImport("libz.so", CharSet = CharSet.Ansi)]
-	// public static unsafe extern int deflateInit2_(
-	// 	z_stream* strm, 
-	// 	int level, int method, 
-	// 	int windowBits, 
-	// 	int memLevel, 
-	// 	int strategy, 
-	// 	char* version, 
-	// 	int stream_size
-	// );
-
 	[DllImport("libz.so", CharSet = CharSet.Ansi)]
 	public static unsafe extern ZResult inflate(z_stream* strm, ZFlush flush);
 
@@ -45,13 +24,6 @@ internal static class ExternalCalls
 		z_stream* strm, byte* dictionary, uint dictLength);
 
 	[DllImport("libz.so", CharSet = CharSet.Ansi)]
-	public static unsafe extern ZResult inflateCopy(z_stream* dest, z_stream* source);
-
-	[DllImport("libz.so", CharSet = CharSet.Ansi)]
-	public static unsafe extern ZResult inflateInit_(
-		z_stream* strm, char* version, int stream_size);
-
-	[DllImport("libz.so", CharSet = CharSet.Ansi)]
 	public static unsafe extern ZResult inflateInit2_(
 		z_stream* strm, int windowBits, char* version, int stream_size);
 
@@ -61,32 +33,32 @@ internal static class ExternalCalls
 	[DllImport("libz.so")]
 	public static unsafe extern ZResult inflateReset(z_stream* strm);
 
-	[DllImport("/usr/lib/x86_64-linux-gnu/libc.so.6", CharSet = CharSet.Ansi)]
-	public static unsafe extern int fprintf(void* stream, char* format, int param);
+	// [DllImport("/usr/lib/x86_64-linux-gnu/libc.so.6", CharSet = CharSet.Ansi)]
+	// public static unsafe extern int fprintf(void* stream, char* format, int param);
 
-	[DllImport("/usr/lib/x86_64-linux-gnu/libc.so.6", CharSet = CharSet.Ansi)]
-	public static unsafe extern int fprintf(void* stream, char* format, int param1, int param2);
+	// [DllImport("/usr/lib/x86_64-linux-gnu/libc.so.6", CharSet = CharSet.Ansi)]
+	// public static unsafe extern int fprintf(void* stream, char* format, int param1, int param2);
 
-	[DllImport("/usr/lib/x86_64-linux-gnu/libc.so.6", CharSet = CharSet.Ansi)]
-	public static unsafe extern int fclose(void* stream);
+	// [DllImport("/usr/lib/x86_64-linux-gnu/libc.so.6", CharSet = CharSet.Ansi)]
+	// public static unsafe extern int fclose(void* stream);
 
-	[DllImport("/usr/lib/x86_64-linux-gnu/libc.so.6", CharSet = CharSet.Ansi)]
-	public static unsafe extern int ferror(void* stream);
+	// [DllImport("/usr/lib/x86_64-linux-gnu/libc.so.6", CharSet = CharSet.Ansi)]
+	// public static unsafe extern int ferror(void* stream);
 
-	[DllImport("/usr/lib/x86_64-linux-gnu/libc.so.6", CharSet = CharSet.Ansi)]
-	public static unsafe extern int fseeko(void* stream, long off, int whence);
+	// [DllImport("/usr/lib/x86_64-linux-gnu/libc.so.6", CharSet = CharSet.Ansi)]
+	// public static unsafe extern int fseeko(void* stream, long off, int whence);
 
-	[DllImport("/usr/lib/x86_64-linux-gnu/libc.so.6", CharSet = CharSet.Ansi)]
-	public static unsafe extern uint fread(void* ptr, ulong size, ulong n, void* stream);
+	// [DllImport("/usr/lib/x86_64-linux-gnu/libc.so.6", CharSet = CharSet.Ansi)]
+	// public static unsafe extern uint fread(void* ptr, ulong size, ulong n, void* stream);
 
-	[DllImport("/usr/lib/x86_64-linux-gnu/libc.so.6", CharSet = CharSet.Ansi)]
-	public static unsafe extern int getc(void* stream);
+	// [DllImport("/usr/lib/x86_64-linux-gnu/libc.so.6", CharSet = CharSet.Ansi)]
+	// public static unsafe extern int getc(void* stream);
 
-	[DllImport("/usr/lib/x86_64-linux-gnu/libc.so.6", CharSet = CharSet.Ansi)]
-	public static unsafe extern int ungetc(int c, void* stream);
+	// [DllImport("/usr/lib/x86_64-linux-gnu/libc.so.6", CharSet = CharSet.Ansi)]
+	// public static unsafe extern int ungetc(int c, void* stream);
 
-	[DllImport("/usr/lib/x86_64-linux-gnu/libc.so.6", CharSet = CharSet.Ansi)]
-	public static unsafe extern void* fopen(char* file_name, char* modes);
+	// [DllImport("/usr/lib/x86_64-linux-gnu/libc.so.6", CharSet = CharSet.Ansi)]
+	// public static unsafe extern void* fopen(char* file_name, char* modes);
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -179,38 +151,38 @@ public unsafe static class Compat
 	}
 }
 
-public unsafe class FixedArray<T> where T : unmanaged
-{
-    private T* arrayPtr;
-	public readonly uint Length;
+// public unsafe class FixedArray<T> where T : unmanaged
+// {
+//     private T* arrayPtr;
+// 	public readonly uint Length;
 
-    public T this[uint i]
-    {
-        get 
-		{
-			if (i < Length && i >= 0) throw new IndexOutOfRangeException();
-			else return *(arrayPtr + i); 
-		}
-        set 
-		{ 
-			if (i < Length && i >= 0) throw new IndexOutOfRangeException();
-			else *(arrayPtr + i) = value; 
-		}
-    }
+//     public T this[uint i]
+//     {
+//         get 
+// 		{
+// 			if (i < Length && i >= 0) throw new IndexOutOfRangeException();
+// 			else return *(arrayPtr + i); 
+// 		}
+//         set 
+// 		{ 
+// 			if (i < Length && i >= 0) throw new IndexOutOfRangeException();
+// 			else *(arrayPtr + i) = value; 
+// 		}
+//     }
 
-    public FixedArray(uint length)
-    {
-        arrayPtr = (T*)Marshal.AllocHGlobal((int)(sizeof(T) * length));
-    }
+//     public FixedArray(uint length)
+//     {
+//         arrayPtr = (T*)Marshal.AllocHGlobal((int)(sizeof(T) * length));
+//     }
 
-	public FixedArray(T* ptr, uint size)
-	{
-		arrayPtr = (T*)ptr;
-		Length = size;
-	}
+// 	public FixedArray(T* ptr, uint size)
+// 	{
+// 		arrayPtr = (T*)ptr;
+// 		Length = size;
+// 	}
 
-    ~FixedArray()
-    {
-        Marshal.FreeHGlobal((IntPtr)arrayPtr);
-    }
-}
+//     ~FixedArray()
+//     {
+//         Marshal.FreeHGlobal((IntPtr)arrayPtr);
+//     }
+// }

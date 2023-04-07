@@ -20,17 +20,6 @@ public enum ZResult
 	VERSION_ERROR = -6
 }
 
-public enum ZSignal
-{
-	NO_FLUSH,
-	PARTIAL_FLUSH,
-	SYNC_FLUSH,
-	FULL_FLUSH,
-	FINISH,
-	BLOCK,
-	TREES
-}
-
 public enum ZFlush
 {
 	NO_FLUSH,
@@ -40,13 +29,6 @@ public enum ZFlush
 	FINISH,
 	BLOCK,
 	TREES
-}
-
-public enum SeekOpt
-{
-	SET,
-	CUR,
-	END
 }
 
 public static class Constants
