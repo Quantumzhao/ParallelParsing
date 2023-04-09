@@ -32,157 +32,47 @@ internal static class LibZ
 	
 	[DllImport("libz.so")]
 	public static unsafe extern ZResult inflateReset(z_stream* strm);
-
-	// [DllImport("/usr/lib/x86_64-linux-gnu/libc.so.6", CharSet = CharSet.Ansi)]
-	// public static unsafe extern int fprintf(void* stream, char* format, int param);
-
-	// [DllImport("/usr/lib/x86_64-linux-gnu/libc.so.6", CharSet = CharSet.Ansi)]
-	// public static unsafe extern int fprintf(void* stream, char* format, int param1, int param2);
-
-	// [DllImport("/usr/lib/x86_64-linux-gnu/libc.so.6", CharSet = CharSet.Ansi)]
-	// public static unsafe extern int fclose(void* stream);
-
-	// [DllImport("/usr/lib/x86_64-linux-gnu/libc.so.6", CharSet = CharSet.Ansi)]
-	// public static unsafe extern int ferror(void* stream);
-
-	// [DllImport("/usr/lib/x86_64-linux-gnu/libc.so.6", CharSet = CharSet.Ansi)]
-	// public static unsafe extern int fseeko(void* stream, long off, int whence);
-
-	// [DllImport("/usr/lib/x86_64-linux-gnu/libc.so.6", CharSet = CharSet.Ansi)]
-	// public static unsafe extern uint fread(void* ptr, ulong size, ulong n, void* stream);
-
-	// [DllImport("/usr/lib/x86_64-linux-gnu/libc.so.6", CharSet = CharSet.Ansi)]
-	// public static unsafe extern int getc(void* stream);
-
-	// [DllImport("/usr/lib/x86_64-linux-gnu/libc.so.6", CharSet = CharSet.Ansi)]
-	// public static unsafe extern int ungetc(int c, void* stream);
-
-	// [DllImport("/usr/lib/x86_64-linux-gnu/libc.so.6", CharSet = CharSet.Ansi)]
-	// public static unsafe extern void* fopen(char* file_name, char* modes);
 }
 
 [StructLayout(LayoutKind.Sequential)]
-public unsafe struct z_stream
+internal unsafe struct z_stream
 {
+	/// <summary>
+	/// next input byte
+	/// </summary>
 	[MarshalAs(UnmanagedType.LPArray)]
 	public byte* next_in;
+	/// <summary>
+	/// number of bytes available at next_in
+	/// </summary>
 	public uint avail_in;
+	/// <summary>
+	/// total number of input bytes read so far
+	/// </summary>
 	public ulong total_in;
+	/// <summary>
+	/// next output byte will go here
+	/// </summary>
 	[MarshalAs(UnmanagedType.LPArray)]
 	public byte* next_out;
+	/// <summary>
+	/// remaining free space at next_out
+	/// </summary>
 	public uint avail_out;
+	/// <summary>
+	/// total number of bytes output so far
+	/// </summary>
 	public ulong total_out;
+
+#region UNUSED
 	[MarshalAs(UnmanagedType.LPStr)]
 	public char* msg;
 	public void* state;
-	// https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/proposals/csharp-9.0/function-pointers
-	// unused
 	public delegate* unmanaged[Cdecl]<void*, uint, uint, void*> zalloc;
-	// unused
 	public delegate* unmanaged[Cdecl]<void*, void*, void> zfree;
-	// unused
 	public void* opaque;
 	public int data_type;
-	// unused
 	public ulong adler;
-	// unused
 	public ulong reserved;
+#endregion
 }
-
-// public class ZStream
-// {
-// 	// public unsafe ZStream(z_stream* strm)
-// 	// {
-// 	// 	_Hndl = strm;
-// 	// 	NextIn = new FixedArray<char>(_Hndl->next_in, _Hndl->avail_in);
-// 	// 	NextOut = new FixedArray<char>(_Hndl->next_out, _Hndl->avail_out);
-// 	// }
-
-// 	[FixedAddressValueType]
-// 	internal unsafe z_stream* _Hndl;
-// 	public readonly FixedArray<char> NextIn;
-// 	public unsafe ulong TotalIn
-// 	{
-// 		get => _Hndl->total_in;
-// 		set => _Hndl->total_in = value;
-// 	}
-// 	public readonly FixedArray<char> NextOut;
-// 	public unsafe ulong TotalOut
-// 	{
-// 		get => _Hndl->total_out;
-// 		set => _Hndl->total_out = value;
-// 	}
-// 	public unsafe string? Message => Marshal.PtrToStringAnsi((IntPtr)_Hndl->msg);
-// 	public unsafe int DataType
-// 	{
-// 		get => _Hndl->data_type;
-// 		set => _Hndl->data_type = value;
-// 	}
-
-// 	public static unsafe implicit operator z_stream*(ZStream strm)
-// 	{
-// 		return strm._Hndl;
-// 	}
-
-// 	public static unsafe implicit operator IntPtr(ZStream strm)
-// 	{
-// 		return (IntPtr)strm._Hndl;
-// 	}
-
-// }
-
-public unsafe static class Compat
-{
-	public static ZResult InflateInit2(z_stream* strm, int windowBits)
-	{
-		fixed (char* ptr = ZLIB_VERSION)
-		{
-			return (ZResult)inflateInit2_(strm, windowBits, ptr, sizeof(z_stream));
-		}
-	}
-
-	public static unsafe ZResult InflateSetDictionary(
-		z_stream* strm, byte[] dictionary, uint dictLength)
-	{
-		fixed (byte* ptr = dictionary)
-		{
-			return inflateSetDictionary(strm, ptr, dictLength);
-		}
-	}
-}
-
-// public unsafe class FixedArray<T> where T : unmanaged
-// {
-//     private T* arrayPtr;
-// 	public readonly uint Length;
-
-//     public T this[uint i]
-//     {
-//         get 
-// 		{
-// 			if (i < Length && i >= 0) throw new IndexOutOfRangeException();
-// 			else return *(arrayPtr + i); 
-// 		}
-//         set 
-// 		{ 
-// 			if (i < Length && i >= 0) throw new IndexOutOfRangeException();
-// 			else *(arrayPtr + i) = value; 
-// 		}
-//     }
-
-//     public FixedArray(uint length)
-//     {
-//         arrayPtr = (T*)Marshal.AllocHGlobal((int)(sizeof(T) * length));
-//     }
-
-// 	public FixedArray(T* ptr, uint size)
-// 	{
-// 		arrayPtr = (T*)ptr;
-// 		Length = size;
-// 	}
-
-//     ~FixedArray()
-//     {
-//         Marshal.FreeHGlobal((IntPtr)arrayPtr);
-//     }
-// }
