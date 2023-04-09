@@ -3,7 +3,7 @@ using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using static System.Runtime.InteropServices.NativeMemory;
-using static ParallelParsing.ZRan.NET.libz;
+using static ParallelParsing.ZRan.NET.LibZ;
 using static ParallelParsing.ZRan.NET.Constants;
 using static ParallelParsing.ZRan.NET.Compat;
 
@@ -11,14 +11,15 @@ namespace ParallelParsing.ZRan.NET;
 
 public unsafe class Index
 {
-	// total length of uncompressed data
-	public long length;
+	// // total length of uncompressed data
+	// public long length;
+
 	// allocated list of entries
-	public List<Point> list;
+	public List<Point> List;
 
 	public Index()
 	{
-		list = new List<Point>(8);
+		List = new List<Point>(8);
 	}
 
 	public void AddPoint(int bits, long @in, long @out, uint left, byte[] window)
@@ -26,30 +27,37 @@ public unsafe class Index
 		Point next = new Point(@out, @in, bits);
 
 		if (left != 0)
-			Array.Copy(window, WINSIZE - left, next.window, 0, left);
+			Array.Copy(window, WINSIZE - left, next.Window, 0, left);
 			
 		if (left < WINSIZE)
-			Array.Copy(window, 0, next.window, left, WINSIZE - left);
-		this.list.Add(next);
+			Array.Copy(window, 0, next.Window, left, WINSIZE - left);
+		this.List.Add(next);
 	}
 }
 
 public struct Point
 {
 	// corresponding offset in uncompressed data
-	public readonly long output;
+	public readonly long Output;
 	// offset in input file of first full byte
-	public readonly long input;
+	public readonly long Input;
 	// number of bits (1-7) from byte at in-1, or 0
-	public readonly int bits;
+	public readonly int Bits;
 	// preceding 32K of uncompressed data
-	public readonly byte[] window = new byte[WINSIZE];
+	public readonly byte[] Window;
 
-	public Point(long @out, long @in, int bits)
+	public Point(long output, long input, int bits)
 	{
-		this.output = @out;
-		this.input = @in;
-		this.bits = bits;
+		this.Output = output;
+		this.Input = input;
+		this.Bits = bits;
+		this.Window = new byte[WINSIZE];
+	}
+
+	internal Point(long output, long input, int bits, byte[] window)
+	: this(output, input, bits)
+	{
+		this.Window = window;
 	}
 }
 
@@ -169,7 +177,7 @@ public static unsafe class Core
 				} while (strm.avail_in != 0);
 			} while (ret != ZResult.STREAM_END);
 
-			index.length = totout;
+			// index.length = totout;
 			return index;
 		}
 		finally
@@ -230,10 +238,10 @@ public static unsafe class Core
 				return 0;
 
 			// find where in stream to start
-			value = index.list.Count;
-			while (--value != 0 && index.list[streamOffset + 1].output <= offset)
+			value = index.List.Count;
+			while (--value != 0 && index.List[streamOffset + 1].Output <= offset)
 				streamOffset++;
-			here = index.list[streamOffset];
+			here = index.List[streamOffset];
 
 			// initialize file and inflate state to start there
 			strm.zalloc = null;
@@ -245,11 +253,11 @@ public static unsafe class Core
 			ret = InflateInit2(&strm, -15);
 			if (ret != ZResult.OK)
 				throw new ZException(ret);
-			file.Position = file.Seek(here.input - (here.bits != 0 ? 1 : 0), SeekOrigin.Begin);
+			file.Position = file.Seek(here.Input - (here.Bits != 0 ? 1 : 0), SeekOrigin.Begin);
 			// ret = (ZResult)fseeko(@in, here.@in - (here.bits != 0 ? 1 : 0), (int)SeekOpt.SET);
 			// if (ret == ZResult.ERRNO)
 			// 	throw new ZException(ret);
-			if (here.bits != 0)
+			if (here.Bits != 0)
 			{
 				ret = (ZResult)file.ReadByte();
 				// ret = (ZResult)getc(@in);
@@ -258,12 +266,12 @@ public static unsafe class Core
 					// ret = ferror(@in) != 0 ? ZResult.ERRNO : ZResult.DATA_ERROR;
 					throw new ZException(ZResult.DATA_ERROR);
 				}
-				inflatePrime(&strm, here.bits, value >> (8 - here.bits));
+				inflatePrime(&strm, here.Bits, value >> (8 - here.Bits));
 			}
-			InflateSetDictionary(&strm, here.window, WINSIZE);
+			InflateSetDictionary(&strm, here.Window, WINSIZE);
 
 			// skip uncompressed bytes until offset reached, then satisfy request
-			offset -= here.output;
+			offset -= here.Output;
 			strm.avail_in = 0;
 			// while skipping to offset
 			skip = true;

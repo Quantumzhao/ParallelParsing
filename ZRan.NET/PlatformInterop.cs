@@ -4,11 +4,11 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using static ParallelParsing.ZRan.NET.Constants;
-using static ParallelParsing.ZRan.NET.libz;
+using static ParallelParsing.ZRan.NET.LibZ;
 
 namespace ParallelParsing.ZRan.NET;
 
-internal static class libz
+internal static class LibZ
 {
 	[DllImport("libz.so", CharSet = CharSet.Ansi)]
 	public static unsafe extern ZResult inflate(z_stream* strm, ZFlush flush);
