@@ -1,5 +1,9 @@
+using System.Threading.Tasks;
 
+using System.Collections.Generic;
 using System.Collections;
+using ParallelParsing.ZRan.NET;
+using Index = ParallelParsing.ZRan.NET.Index;
 
 namespace ParallelParsing;
 
@@ -23,20 +27,53 @@ public sealed class LazyFileReadParallel : IEnumerable<byte[]>
 
 public sealed class LazyFileReadSequential : IEnumerable<byte[]>
 {
-	private readonly Index _Index;
+	private readonly FileReader _Enumerator;
 
-	public LazyFileReadSequential(Index index)
+	public LazyFileReadSequential(Index index, string path)
 	{
-		_Index = index;
+		var file = File.OpenRead(path);
+		_Enumerator = new FileReader(index, file);
 	}
 
-	public IEnumerator<byte[]> GetEnumerator()
-	{
-		throw new NotImplementedException();
-	}
+	public IEnumerator<byte[]> GetEnumerator() => _Enumerator;
 
-	IEnumerator IEnumerable.GetEnumerator()
+	IEnumerator IEnumerable.GetEnumerator() => this.GetEnumerator();
+
+	private sealed class FileReader : IEnumerator<byte[]>
 	{
-		throw new NotImplementedException();
+		public byte[] Current => throw new NotImplementedException();
+
+		object IEnumerator.Current => throw new NotImplementedException();
+
+		public FileReader(Index index, FileStream file)
+		{
+			_Index = index;
+			_File = file;
+			_BinReader = new BinaryReader(file);
+			_ListEnumerator = index.List.GetEnumerator();
+		}
+
+		private readonly Index _Index;
+		private readonly FileStream _File;
+		private readonly BinaryReader _BinReader;
+		private readonly IEnumerator _ListEnumerator;
+
+
+		public void Dispose()
+		{
+			_BinReader.Dispose();
+			_File.Dispose();
+		}
+
+		public bool MoveNext()
+		{
+			var e = _Index.List.GetEnumerator();
+			return e.MoveNext();
+		}
+
+		public void Reset()
+		{
+			
+		}
 	}
 }

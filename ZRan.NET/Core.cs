@@ -4,7 +4,7 @@ using static ParallelParsing.ZRan.NET.Compat;
 
 namespace ParallelParsing.ZRan.NET;
 
-public unsafe class Index
+public class Index
 {
 	// allocated list of entries
 	public List<Point> List;
@@ -53,7 +53,7 @@ public struct Point
 	}
 }
 
-public static unsafe class Core
+public static class Core
 {
 	/// <summary>
 	/// Make one entire pass through a zlib or gzip compressed stream and build an
@@ -339,5 +339,10 @@ public static unsafe class Core
 			// clean up and return the bytes read, or the negative error
 			InflateEnd(strm);
 		}
+	}
+
+	public static byte[] ExtractDeflateRange(in byte[] inputBuffer, Point p, byte[] outputBuffer)
+	{
+		throw new NotImplementedException();
 	}
 }
