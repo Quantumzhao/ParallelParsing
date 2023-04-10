@@ -103,8 +103,6 @@ public unsafe class ZStream
 	{
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		get => Value.data_type;
-		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		set => Value.data_type = value;
 	}
 
 	private byte[]? _NextIn;

@@ -1,18 +1,11 @@
 
-using System;
-using System.IO;
-using System.Runtime.InteropServices;
 using static ParallelParsing.ZRan.NET.Constants;
 using static ParallelParsing.ZRan.NET.Compat;
-using System.Diagnostics;
 
 namespace ParallelParsing.ZRan.NET;
 
 public unsafe class Index
 {
-	// // total length of uncompressed data
-	// public long length;
-
 	// allocated list of entries
 	public List<Point> List;
 
@@ -67,13 +60,10 @@ public static unsafe class Core
 	/// index, with access points about every span bytes of uncompressed output.
 	/// gzip files with multiple members are indexed in their entirety. 
 	/// </summary>
-	/// <param name="file"></param>
 	/// <param name="span">
 	/// span should be chosen to balance the speed of random access against the memory 
 	/// requirements of the list, about 32K bytes per access point. 
 	/// </param>
-	/// <param name="built"></param>
-	/// <returns></returns>
 	public static Index BuildDeflateIndex(FileStream file, long span)
 	{
 		ZStream strm = new();
@@ -85,30 +75,27 @@ public static unsafe class Core
 		{
 			ZResult ret;
 			// our own total counters to avoid 4GB limit
-			long totin, totout;
+			long totin = 0;
+			long totout = 0;
 			// totout value of last access point
-			long last;
+			long last = 0;
 
-			// automatic gzip decoding
+			// 47: enable zlib and gzip decoding with automatic header detection
 			ret = InflateInit(strm, 47);
 			if (ret != ZResult.OK)
 			{
 				throw new ZException(ret);
 			}
+			strm.AvailOut = 0;
 
 			// inflate the input, maintain a sliding window, and build an index -- this
 			// also validates the integrity of the compressed data using the check
 			// information in the gzip or zlib stream
-			totin = totout = last = 0;
-			strm.AvailOut = 0;
 			do
 			{
 				// get some compressed data from input file
 				strm.AvailIn = (uint)file.Read(input, 0, (int)CHUNK);
-				// if (ferror(@in) != 0)
-				// {
-				// 	throw new ZException(ZResult.ERRNO);
-				// }
+
 				if (strm.AvailIn == 0)
 				{
 					throw new ZException(ZResult.DATA_ERROR);
@@ -157,6 +144,12 @@ public static unsafe class Core
 					// entry point after the zlib or gzip header, and assures that the
 					// index always has at least one access point; we avoid creating an
 					// access point after the last block by checking bit 6 of data_type
+					// * strm.DataType: the number of unused bits 
+					// * in the last byte taken from strm->next_in
+					// * +64 if inflate() is currently decoding the last block in the deflate stream
+					// * +128 if inflate() returned immediately after decoding an end-of-block code
+					// *      or decoding the complete header up to just before the first byte 
+					// *      of the deflate stream
 					if ((strm.DataType & 128) != 0 && (strm.DataType & 64) == 0 &&
 						(totout == 0 || totout - last > span))
 					{
@@ -176,24 +169,14 @@ public static unsafe class Core
 		}
 	}
 
-	/// <summary>
-	/// Use the index to read len bytes from offset into buf. 
-	/// </summary>
-	/// <param name="file"></param>
-	/// <param name="index"></param>
-	/// <param name="offset">
-	/// starting from `offset` of bytes
-	/// </param>
-	/// <param name="buf"></param>
-	/// <param name="len">
-	/// count of bytes
-	/// </param>
+	/// <summary>Use the index to read len bytes from offset into buf. </summary>
+	/// <param name="offset">starting from `offset` of uncompressed bytes</param>
+	/// <param name="len">count of uncompressed bytes</param>
 	/// <returns>
-	/// bytes read. 
-	/// If data is requested past
-	/// the end of the uncompressed data, then deflate_index_extract() will return a
-	/// value less than len, indicating how much was actually read into buf. This
-	/// function should not throw a data error unless the file was modified since
+	/// bytes read. If data is requested past the end of the uncompressed data, 
+	/// then deflate_index_extract() will return a value less than len, 
+	/// indicating how much was actually read into buf. 
+	/// This function should not throw a data error unless the file was modified since
 	/// the index was generated, since deflate_index_build() validated all of the
 	/// input. deflate_index_extract() will return Z_ERRNO if there is an error on
 	/// reading or seeking the input file.
@@ -201,7 +184,6 @@ public static unsafe class Core
 	public static int ExtractDeflateIndex(
 		FileStream file, Index index, long offset, byte[] buf, int len)
 	{
-		// no need to pin (I guess); it's an unmanaged struct on stack
 		ZStream strm = new();
 		byte[] input = new byte[CHUNK];
 		byte[] discard = new byte[WINSIZE];
@@ -225,6 +207,10 @@ public static unsafe class Core
 			here = index.List[streamOffset];
 
 			// raw inflate
+			// - -windowBits determines the window size
+			// - not looking for a zlib or gzip header
+			// - not generating a check value
+			// - not looking for any check values for comparison at the end of the stream
 			ret = InflateInit(strm, -15);
 			if (ret != ZResult.OK)
 				throw new ZException(ret);
@@ -297,11 +283,6 @@ public static unsafe class Core
 							strm.AvailIn = 0;
 						}
 						else
-						{
-							strm.AvailIn -= 8;
-							throw new UnreachableException();
-							// strm.next_in += 8;
-						}
 						
 						if (strm.AvailIn == 0 && file.Position == file.Length)
 							// the input ended after the gzip trailer -- done
@@ -317,11 +298,7 @@ public static unsafe class Core
 							if (strm.AvailIn == 0)
 							{
 								strm.AvailIn = (uint)file.Read(input, 0, (int)CHUNK);
-								// if (ferror(@in) != 0)
-								// {
-								// 	ret = ZResult.ERRNO;
-								// 	throw new ZException(ZResult.ERRNO);
-								// }
+
 								if (strm.AvailIn == 0)
 								{
 									ret = ZResult.DATA_ERROR;
