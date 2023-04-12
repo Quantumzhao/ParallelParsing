@@ -3,6 +3,7 @@ using System.Collections;
 using System.IO;
 using System.IO.Compression;
 using System.Text;
+using System.Linq;
 
 // test file downloaded from
 // https://trace.ncbi.nlm.nih.gov/Traces/?view=run_browser&acc=SRR11192680
@@ -10,11 +11,15 @@ using System.Text;
 
 namespace ParallelParsing;
 
-public class GzipDecompressor
+public class Program
 {
     public static int readByteSize = 64;
     static void Main(string[] args)
     {
+        var gzipPath = "something";
+        var indexPath = "somethingelse";
+        Decompressor.DecompressAll(indexPath, gzipPath).Aggregate(0, 
+            (a, x) => a + x.Sequence.Count(c => c == 'A'));
         // byte[] buffer = File.ReadAllBytes("Gzipped_FASTQ_Files/SRR11192680.fastq.gz");
 
         // byte[] buffer = FileToByteArray("Gzipped_FASTQ_Files/SRR11192680.fastq.gz");
