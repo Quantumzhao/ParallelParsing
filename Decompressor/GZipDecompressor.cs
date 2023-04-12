@@ -9,7 +9,7 @@ public sealed class Decompressor
 	public static IEnumerable<FASTQRecord> DecompressAll(string indexPath, string gzipPath, 
 		bool enableSsdOptimization = false)
 	{
-		var index = IndexIO.DeSerialize(indexPath);
+		var index = IndexIO.Deserialize(indexPath);
 		var reader = new LazyFileReadSequential(index, gzipPath);
 		var allRecords = new List<FASTQRecord>();
 
@@ -25,7 +25,7 @@ public sealed class Decompressor
 	public static IEnumerable<FASTQRecord> DecompressRange(string indexPath, string gzipPath, 
 		Point fromPoint, Point toPoint, bool enableSsdOptimization)
 	{
-		var index = IndexIO.DeSerialize(indexPath);
+		var index = IndexIO.Deserialize(indexPath);
 		var reader = new LazyFileReadSequential(index, gzipPath);
 		
 		throw new NotImplementedException();

@@ -7,7 +7,7 @@ using Index = ParallelParsing.ZRan.NET.Index;
 var fileName = "../Gzipped_FASTQ_Files/SRR11192680.fastq.gz";
 // var fileName = "../Gzipped_FASTQ_Files/tests/gplv3.txt.gz";
 using var file = File.OpenRead(fileName);
-var index = Core.BuildDeflateIndex(file, Constants.SPAN, IndexIO.DeSerialize(fileName).ChunkSize);
+var index = Core.BuildDeflateIndex(file, Constants.SPAN, IndexIO.Deserialize(fileName).ChunkSize);
 // Console.WriteLine(len);
 
 const int LEN = 16384;

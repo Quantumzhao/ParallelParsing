@@ -24,7 +24,7 @@ public static class IndexIO
 		}
 	}
 
-	public static Index DeSerialize(string path)
+	public static Index Deserialize(string path)
 	{
 		using var stream = File.OpenRead(path);
 		using var br = new BinaryReader(stream);
