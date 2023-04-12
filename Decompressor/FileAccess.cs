@@ -56,24 +56,21 @@ public sealed class LazyFileReadSequential : IEnumerable<byte[]>
 		private readonly Index _Index;
 		private readonly FileStream _File;
 		private readonly BinaryReader _BinReader;
-		private readonly IEnumerator _ListEnumerator;
+		private readonly IEnumerator<Point> _ListEnumerator;
 
 
 		public void Dispose()
 		{
 			_BinReader.Dispose();
 			_File.Dispose();
+			_ListEnumerator.Dispose();
 		}
 
 		public bool MoveNext()
 		{
-			var e = _Index.List.GetEnumerator();
-			return e.MoveNext();
+			return _ListEnumerator.MoveNext();
 		}
 
-		public void Reset()
-		{
-			
-		}
+		void IEnumerator.Reset() => new NotSupportedException();
 	}
 }

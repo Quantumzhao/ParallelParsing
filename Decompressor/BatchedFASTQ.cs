@@ -3,19 +3,33 @@ using System.Collections;
 
 namespace ParallelParsing;
 
-class BatchedFASTQ : IReadOnlyList<FASTQRecord>
+class BatchedFASTQ : IEnumerable<FASTQRecord>
 {
-	public FASTQRecord this[int index] { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
-
-	public int Count => throw new NotImplementedException();
-
-	public IEnumerator<FASTQRecord> GetEnumerator()
+	public BatchedFASTQ()
 	{
-		throw new NotImplementedException();
+		_Enumerator = new Enumerator();
 	}
 
-	IEnumerator IEnumerable.GetEnumerator()
+	private Enumerator _Enumerator;
+
+	public IEnumerator<FASTQRecord> GetEnumerator() => _Enumerator;
+	IEnumerator IEnumerable.GetEnumerator() => _Enumerator;
+
+	private class Enumerator : IEnumerator<FASTQRecord>
 	{
-		throw new NotImplementedException();
+		public FASTQRecord Current => throw new NotImplementedException();
+		object IEnumerator.Current => this.Current;
+
+		public void Dispose()
+		{
+			throw new NotImplementedException();
+		}
+
+		public bool MoveNext()
+		{
+			throw new NotImplementedException();
+		}
+
+		void IEnumerator.Reset() => throw new NotSupportedException();
 	}
 }

@@ -12,11 +12,20 @@ public sealed class Decompressor
 		var index = IndexIO.DeSerialize(indexPath);
 		var reader = new LazyFileReadSequential(index, gzipPath);
 		var allRecords = new List<FASTQRecord>();
-		var res = Parallel.ForEach(reader, outputBytes => {
-			var parsed = FASTQRecord.Parse(Encoding.ASCII.GetString(outputBytes));
+
+		// assume the output bytes are exactly aligned, no more, no less
+		Parallel.ForEach(reader, outputBytes => {
+			var parsed = FASTQRecord.Parse(new Queue<char>(Encoding.ASCII.GetChars(outputBytes)));
 			allRecords.AddRange(parsed);
 		});
 
 		return allRecords;
+	}
+
+	public static IEnumerable<FASTQRecord> DecompressRange(int fromPoint, int toPoint, 
+		string indexPath, string gzipPath)
+	{
+		var index = IndexIO.DeSerialize(indexPath);
+		throw new NotImplementedException();
 	}
 }

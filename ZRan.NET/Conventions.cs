@@ -196,9 +196,11 @@ public unsafe static class Compat
 	/// <param name="strm"></param>
 	/// <param name="bits">must be less than or equal to 16</param>
 	/// <param name="value">
-	/// many of the least significant bits of value will be inserted in the input</param>
+	/// many of the least significant bits of value will be inserted in the input
+	/// </param>
 	/// <returns>Z_OK if success, or Z_STREAM_ERROR 
-	/// if the source stream state was inconsistent</returns>
+	/// if the source stream state was inconsistent
+	/// </returns>
 	public static ZResult InflatePrime(ZStream strm, int bits, int value) 
 		=> inflatePrime(strm.Ptr, bits, value);
 

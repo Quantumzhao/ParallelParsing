@@ -27,7 +27,7 @@ public class Index
 	}
 }
 
-public struct Point
+public class Point
 {
 	// corresponding offset in uncompressed data
 	public readonly long Output;
