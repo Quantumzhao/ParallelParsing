@@ -7,10 +7,13 @@ public class Index
 {
 	// allocated list of entries
 	public List<Point> List;
+	// chunk size
+	public uint ChunkSize;
 
-	public Index()
+	public Index(uint chunksize)
 	{
 		List = new List<Point>(8);
+		ChunkSize = chunksize;
 	}
 
 	public void AddPoint(int bits, long input, long output, uint left, byte[] window)

@@ -15,10 +15,10 @@ public static class Core
 	/// span should be chosen to balance the speed of random access against the memory 
 	/// requirements of the list, about 32K bytes per access point. 
 	/// </param>
-	public static Index BuildDeflateIndex(FileStream file, long span)
+	public static Index BuildDeflateIndex(FileStream file, long span, uint chunksize)
 	{
 		ZStream strm = new();
-		Index index = new Index();
+		Index index = new Index(chunksize);
 		byte[] input = new byte[CHUNK];
 		byte[] window = new byte[WINSIZE];
 
