@@ -41,9 +41,17 @@ public sealed class LazyFileReadSequential : IEnumerable<byte[]>
 
 	private sealed class FileReader : IEnumerator<byte[]>
 	{
-		public byte[] Current => throw new NotImplementedException();
+		private byte[]? _Buffer;
+		public byte[] Current
+		{
+			get
+			{
+				if (_Buffer == null) throw new InvalidOperationException();
+				else return _Buffer;
+			}
+		}
 
-		object IEnumerator.Current => throw new NotImplementedException();
+		object IEnumerator.Current => this.Current;
 
 		public FileReader(Index index, FileStream file)
 		{
@@ -51,12 +59,14 @@ public sealed class LazyFileReadSequential : IEnumerable<byte[]>
 			_File = file;
 			_BinReader = new BinaryReader(file);
 			_ListEnumerator = index.List.GetEnumerator();
+			_CurrPoint = new Point(0, 0, 0);
 		}
 
 		private readonly Index _Index;
 		private readonly FileStream _File;
 		private readonly BinaryReader _BinReader;
 		private readonly IEnumerator<Point> _ListEnumerator;
+		private readonly Point _CurrPoint;
 
 
 		public void Dispose()
@@ -68,7 +78,17 @@ public sealed class LazyFileReadSequential : IEnumerable<byte[]>
 
 		public bool MoveNext()
 		{
-			return _ListEnumerator.MoveNext();
+			var from = (int)(_ListEnumerator.Current?.Output ?? 0);
+			
+			var ret = _ListEnumerator.MoveNext();
+			var to = (int)(_ListEnumerator.Current?.Output ?? _File.Length);
+			if (!ret) return false;
+
+			// ? might be problematic once file size > 2GB
+			var len = to - from;
+			_Buffer = new byte[len];
+			_File.ReadExactly(_Buffer, from, len);
+			return true;
 		}
 
 		void IEnumerator.Reset() => new NotSupportedException();

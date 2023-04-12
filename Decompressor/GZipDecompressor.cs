@@ -22,10 +22,12 @@ public sealed class Decompressor
 		return allRecords;
 	}
 
-	public static IEnumerable<FASTQRecord> DecompressRange(int fromPoint, int toPoint, 
-		string indexPath, string gzipPath)
+	public static IEnumerable<FASTQRecord> DecompressRange(string indexPath, string gzipPath, 
+		Point fromPoint, Point toPoint, bool enableSsdOptimization)
 	{
 		var index = IndexIO.DeSerialize(indexPath);
+		var reader = new LazyFileReadSequential(index, gzipPath);
+		
 		throw new NotImplementedException();
 	}
 }

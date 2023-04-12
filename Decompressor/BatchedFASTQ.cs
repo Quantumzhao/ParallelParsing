@@ -5,7 +5,7 @@ namespace ParallelParsing;
 
 class BatchedFASTQ : IEnumerable<FASTQRecord>
 {
-	public BatchedFASTQ()
+	public BatchedFASTQ(string indexPath, string gzipPath)
 	{
 		_Enumerator = new Enumerator();
 	}

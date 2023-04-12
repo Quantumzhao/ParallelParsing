@@ -18,7 +18,7 @@ public class GzipDecompressor
         // byte[] buffer = File.ReadAllBytes("Gzipped_FASTQ_Files/SRR11192680.fastq.gz");
 
         // byte[] buffer = FileToByteArray("Gzipped_FASTQ_Files/SRR11192680.fastq.gz");
-        byte[] buffer = FileToByteArray("Gzipped_FASTQ_Files/SRR21524988.fastq.gz");
+        byte[] buffer = FileToByteArray("../Gzipped_FASTQ_Files/SRR11192680.fastq.gz");
         // byte[] buffer = FileToByteArray("Gzipped_FASTQ_Files/examplefile.gz");
 
         string outputString = BitConverter.ToString(buffer);
