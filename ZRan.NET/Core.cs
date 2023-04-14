@@ -1,11 +1,25 @@
 
 using static ParallelParsing.ZRan.NET.Constants;
 using static ParallelParsing.ZRan.NET.Compat;
+using System.IO.Compression;
 
 namespace ParallelParsing.ZRan.NET;
 
 public static class Core
 {
+	private enum StatusAtChunkEnd
+	{
+		ALL_CLEARED,
+		INTO_ID,
+		AFTER_ID,
+		INTO_SEQ,
+		AFTER_SEQ,
+		INTO_PLUS,
+		AFTER_PLUS,
+		INTO_QUALITY,
+		AFTER_QUALITY = ALL_CLEARED
+	}
+
 	/// <summary>
 	/// Make one entire pass through a zlib or gzip compressed stream and build an
 	/// index, with access points about every span bytes of uncompressed output.
@@ -67,6 +81,25 @@ public static class Core
 					// update the total input and output counters
 					totin += strm.AvailIn;
 					totout += strm.AvailOut;
+					// * Z_BLOCK requests that inflate() stop if and when it gets to 
+					// * the next deflate block boundary. When decoding the zlib or gzip format, 
+					// * this will cause inflate() to return immediately after the header and 
+					// * before the first block. 
+					// * The Z_BLOCK option assists in appending to or combining deflate streams. 
+					// * To assist in this, on return inflate() always sets strm->data_type 
+					// * to the number of unused bits in the last byte taken from strm->next_in, 
+					// * plus 64 if inflate() is currently decoding the last block 
+					// * in the deflate stream, plus 128 if inflate() returned immediately 
+					// * after decoding an end-of-block code or decoding the complete header 
+					// * up to just before the first byte of the deflate stream. 
+					// * The end-of-block will not be indicated until all of the uncompressed data 
+					// * from that block has been written to strm->next_out. 
+					// * The number of unused bits may in general be greater than seven, 
+					// * except when bit 7 of data_type is set, 
+					// * in which case the number of unused bits will be less than eight. 
+					// * data_type is set as noted here every time inflate() returns 
+					// * for all flush options, and so can be used to determine the amount of 
+					// * currently consumed input in bits. 
 					// return at end of block
 					ret = Inflate(strm, ZFlush.BLOCK);
 					totin -= strm.AvailIn;
