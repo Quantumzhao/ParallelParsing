@@ -2,35 +2,37 @@ using System;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Security;
 using System.Text;
 using static ParallelParsing.ZRan.NET.Constants;
 using static ParallelParsing.ZRan.NET.LibZ;
 
 namespace ParallelParsing.ZRan.NET;
 
+[SuppressUnmanagedCodeSecurity]
 internal static class LibZ
 {
-	[DllImport("libz.so", CharSet = CharSet.Ansi)]
+	[DllImport("libz", CharSet = CharSet.Ansi)]
 	public static unsafe extern ZResult inflate(z_stream* strm, ZFlush flush);
 
-	[DllImport("libz.so", CharSet = CharSet.Ansi)]
+	[DllImport("libz", CharSet = CharSet.Ansi)]
 	public static unsafe extern ZResult inflateEnd(z_stream* strm);
 
-	[DllImport("libz.so", CharSet = CharSet.Ansi)]
+	[DllImport("libz", CharSet = CharSet.Ansi)]
 	public static unsafe extern ZResult inflatePrime(z_stream* strm, int bits, int value);
 
-	[DllImport("libz.so", CharSet = CharSet.Ansi)]
+	[DllImport("libz", CharSet = CharSet.Ansi)]
 	public static unsafe extern ZResult inflateSetDictionary(
 		z_stream* strm, byte* dictionary, uint dictLength);
 
-	[DllImport("libz.so", CharSet = CharSet.Ansi)]
+	[DllImport("libz", CharSet = CharSet.Ansi)]
 	public static unsafe extern ZResult inflateInit2_(
 		z_stream* strm, int windowBits, char* version, int stream_size);
 
-	[DllImport("libz.so")]
+	[DllImport("libz")]
 	public static unsafe extern ZResult inflateReset2(z_stream* strm, int windowBits);
 	
-	[DllImport("libz.so")]
+	[DllImport("libz")]
 	public static unsafe extern ZResult inflateReset(z_stream* strm);
 }
 
