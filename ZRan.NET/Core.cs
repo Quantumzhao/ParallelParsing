@@ -7,19 +7,6 @@ namespace ParallelParsing.ZRan.NET;
 
 public static class Core
 {
-	private enum StatusAtChunkEnd
-	{
-		ALL_CLEARED,
-		INTO_ID,
-		AFTER_ID,
-		INTO_SEQ,
-		AFTER_SEQ,
-		INTO_PLUS,
-		AFTER_PLUS,
-		INTO_QUALITY,
-		AFTER_QUALITY = ALL_CLEARED
-	}
-
 	/// <summary>
 	/// Make one entire pass through a zlib or gzip compressed stream and build an
 	/// index, with access points about every span bytes of uncompressed output.
@@ -35,6 +22,9 @@ public static class Core
 		Index index = new Index(chunksize);
 		byte[] input = new byte[CHUNK];
 		byte[] window = new byte[WINSIZE];
+		int recordCounter = 0;
+		int inByteCounter = 0;
+		int outByteCounter = 0;
 
 		try
 		{
@@ -118,6 +108,17 @@ public static class Core
 							continue;
 						}
 						break;
+					}
+
+					var len = strm.NextOut.Length;
+					for (int i = 0; i < len; i++)
+					{
+						var c = strm.NextOut[i];
+						// @ = 64
+						if (c == 64)
+						{
+							recordCounter++;
+						}
 					}
 
 					// if at end of block, consider adding an index entry (note that if
