@@ -110,15 +110,47 @@ public static class Core
 						break;
 					}
 
+					int tempOutByteCounter = 0; // for the ending buffer
+					int tempRecordCounter = 0; // for the ending buffer
 					var len = strm.NextOut.Length;
 					for (int i = 0; i < len; i++)
 					{
 						var c = strm.NextOut[i];
-						// @ = 64
+						// '@' = 64
 						if (c == 64)
 						{
-							recordCounter++;
+							tempRecordCounter++;
+							if (recordCounter < index.ChunkSize)
+								recordCounter++;
 						}
+
+						if (tempRecordCounter <= index.ChunkSize)
+						{
+							tempOutByteCounter++;
+						}
+
+						// if (recordCounter <= index.ChunkSize) 
+						// {
+						// 	if (c == 64 && recordCounter < index.ChunkSize) 
+						// 		recordCounter++;
+
+						// 	if (recordCounter <= index.ChunkSize)
+						// 		tempOutByteCounter++;
+						// }
+					}
+
+					// * Things to do:
+					// 		* recordCounter
+					// 		* inByteCounter
+					// 		* outByteCounter
+					//		* window
+					if (recordCounter == index.ChunkSize) {
+						// inByteCounter = ?;
+						outByteCounter += tempOutByteCounter;
+						// index.AddPoint(strm.DataType & 7, totin, totout, strm.AvailOut, window);
+					}
+					else {
+						outByteCounter += len;
 					}
 
 					// if at end of block, consider adding an index entry (note that if
