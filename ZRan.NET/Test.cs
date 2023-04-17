@@ -3,6 +3,12 @@ using System.Runtime.InteropServices;
 using System.Text;
 using ParallelParsing.ZRan.NET;
 using Index = ParallelParsing.ZRan.NET.Index;
+using System.IO.Compression;
+using System.Text;
+
+var testFile = "t.gz";
+using var fs = File.OpenRead(testFile);
+Core.BuildDeflateIndex(fs, Constants.SPAN, 10);
 
 var fileName = "../Gzipped_FASTQ_Files/SRR11192680.fastq.gz";
 // var fileName = "../Gzipped_FASTQ_Files/tests/gplv3.txt.gz";
