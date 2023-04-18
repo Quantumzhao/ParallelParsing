@@ -1,6 +1,6 @@
 # CMSC701_Final_Project
 
-### Implement a “compressed checkpoint index”, and a parallel parser for FASTQ files.
+## Implement a “compressed checkpoint index”, and a parallel parser for FASTQ files.
 
 Motivation: The FASTQ format is the *lingua franca* for raw input to genomics processing pipelines.  For highly-parallel  processing tasks, simply ingesting and parsing the raw read records fast enough is a substantial bottleneck to efficient data processing.  The  FASTQ format suffers from several issues, but chiefly among them are  that (a) the records do not all consume a fixed and equal number of  bytes and (b) the data is often stored, transferred and processed in a  gzipped format, making parallel processing of independent parts of the  file very difficult.  See, for example, [this paper](https://academic.oup.com/bioinformatics/article/35/3/421/5055585) describing the problem when scaling read aligners to many cores.
 
