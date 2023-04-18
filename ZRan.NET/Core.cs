@@ -22,6 +22,7 @@ public static class Core
 		Index index = new Index(chunksize);
 		byte[] input = new byte[CHUNK];
 		byte[] window = new byte[WINSIZE];
+		byte[] tempWindow = new byte[WINSIZE];
 		int recordCounter = 0;
 		int inByteCounter = 0;
 		int outByteCounter = 0;
@@ -91,7 +92,12 @@ public static class Core
 					// * for all flush options, and so can be used to determine the amount of 
 					// * currently consumed input in bits. 
 					// return at end of block
+					strm.NextOut.Print((int)strm.AvailOut);
+					strm.NextIn.Print((int)strm.AvailIn);
+					Console.WriteLine("after inflate:");				
 					ret = Inflate(strm, ZFlush.BLOCK);
+					strm.NextOut.Print((int)strm.AvailOut);
+					strm.NextIn.Print((int)strm.AvailIn);
 					totin -= strm.AvailIn;
 					totout -= strm.AvailOut;
 					if (ret == ZResult.NEED_DICT ||
@@ -110,15 +116,38 @@ public static class Core
 						break;
 					}
 
+					int tempOutByteCounter = 0; // for the ending buffer
+					int tempRecordCounter = 0; // for the ending buffer
 					var len = strm.NextOut.Length;
 					for (int i = 0; i < len; i++)
 					{
 						var c = strm.NextOut[i];
-						// @ = 64
+						// '@' = 64
 						if (c == 64)
 						{
-							recordCounter++;
+							tempRecordCounter++;
+							if (recordCounter < index.ChunkSize)
+								recordCounter++;
 						}
+
+						if (tempRecordCounter <= index.ChunkSize)
+						{
+							tempOutByteCounter++;
+						}
+					}
+
+					// * Things to do:
+					// 		* recordCounter
+					// 		* inByteCounter
+					// 		* outByteCounter
+					//		* window
+					if (recordCounter == index.ChunkSize) {
+						// inByteCounter = ?;
+						outByteCounter += tempOutByteCounter;
+						index.AddPoint(strm.DataType & 7, totin, totout, strm.AvailOut, window);
+					}
+					else {
+						outByteCounter += (len - (int)strm.AvailOut); // plan B: manually count bytes 
 					}
 
 					// if at end of block, consider adding an index entry (note that if
