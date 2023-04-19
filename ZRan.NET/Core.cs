@@ -142,7 +142,7 @@ public static class Core
 					// 		* outByteCounter
 					//		* window
 					if (recordCounter == index.ChunkSize) {
-						// inByteCounter = ?;
+						inByteCounter = (int)(totin + strm.AvailIn);
 						outByteCounter += tempOutByteCounter;
 						index.AddPoint(strm.DataType & 7, totin, totout, strm.AvailOut, window);
 					}
