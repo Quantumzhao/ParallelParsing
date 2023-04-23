@@ -18,6 +18,12 @@ internal static class Debug
 		Console.WriteLine();
 	}
 
+	public static void PrintASCIIFromTo(this byte[] arr, int from, int len)
+	{
+		Console.Write(System.Text.Encoding.UTF8.GetString(arr).Substring(from, len));
+		Console.WriteLine();
+	}
+
 	public static void PrintASCIIFirstAndLast(this byte[] arr, int first)
 	{
 		Console.WriteLine("------------------------- first " + first + " characters--------------------------");

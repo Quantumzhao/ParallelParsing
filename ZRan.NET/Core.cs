@@ -39,6 +39,7 @@ public static class Core
 		long prevTotout = 0;
 		int inputBufferCounter = 0;
 		int SingleByteReadingModeByteCounter = 0;
+		int prevAvailOut = 0;
 
 		try
 		{
@@ -67,22 +68,6 @@ public static class Core
 
 				strm.AvailIn = (uint)file.Read(input, 0, hasPoint ? 1 : (int)CHUNK);
 				
-				if (hasPoint)
-				{
-					SingleByteReadingModeByteCounter++;
-					if (SingleByteReadingModeByteCounter < (int)CHUNK)
-					{
-						inputBufferCounter--;	
-					}
-					else
-					{
-						SingleByteReadingModeByteCounter = 0;
-					}
-				}
-				else 
-				{
-					SingleByteReadingModeByteCounter = 0;
-				}
 				
 				// get some compressed data from input file
 				// strm.AvailIn = (uint)file.Read(input, 0, (int)CHUNK);
@@ -162,62 +147,121 @@ public static class Core
 					int tempOutByteCounter = 0; // for the ending buffer
 					int tempRecordCounter = 0; // for the ending buffer
 					var len = strm.NextOut.Length;
-					for (int i = 0; i < len; i++)
+					
+					
+					
+					for (int i = ((hasPoint && prevAvailOut != 0) || (inputBufferCounter != 0 && prevAvailOut != 0)) ? len-prevAvailOut : 0; 
+						i < len-strm.AvailOut; i++)
 					{
 						var c = strm.NextOut[i];
 						// '@' = 64
 						if (c == 64)
 						{
-							tempRecordCounter++;
-							if (recordCounter < index.ChunkSize)
-								recordCounter++;
+							recordCounter++;
+							if (recordCounter == index.ChunkSize + 1)
+							{
+								index.AddPoint(strm.DataType & 7, totin, totout, strm.AvailOut, window);
+								recordCounter = 1;
+							}
 						}
-
-						if (tempRecordCounter <= index.ChunkSize)
-						{
-							tempOutByteCounter++;
-						}
+						
 					}
+					
+					// strm.NextOut.PrintASCIIFromTo((inputBufferCounter != 0 && hasPoint && prevAvailOut != 0) ? len-prevAvailOut : 0, len-(int)strm.AvailOut-((inputBufferCounter != 0 && hasPoint && prevAvailOut != 0) ? len-prevAvailOut : 0));
 
+					if (strm.AvailOut > 0)
+					{
+						prevAvailOut = (int)strm.AvailOut;
+					}
+					else 
+					{
+						prevAvailOut = 0;
+					}
+					
+					
+					
+					
 					
 
 
-					// * Things to do:
-					// 		* recordCounter
-					// 		* totin
-					//		* totout
-					//		* window
-					if (recordCounter == index.ChunkSize) {
-						if (strm.AvailOut > 0)
-						{
 
-						}
-						else 
-						{
 
-						}
-						strm.NextOut.PrintASCII(10240);
-						outByteCounter += tempOutByteCounter;
-						prevTotout = totout;
+
+
+
+
+
+
+
+
+
+
+
+					
+					// for (int i = 0; i < len; i++)
+					// {
+					// 	var c = strm.NextOut[i];
+					// 	// '@' = 64
+					// 	if (c == 64)
+					// 	{
+					// 		tempRecordCounter++;
+					// 		if (recordCounter < index.ChunkSize)
+					// 			recordCounter++;
+					// 	}
+
+					// 	if (tempRecordCounter <= index.ChunkSize)
+					// 	{
+					// 		tempOutByteCounter++;
+					// 	}
+					// }
+
+					// if (recordCounter == index.ChunkSize) {
+					// 	if (strm.AvailOut > 0)
+					// 	{
+
+					// 	}
+					// 	else 
+					// 	{
+
+					// 	}
+					// 	strm.NextOut.PrintASCII(10240);
+					// 	outByteCounter += tempOutByteCounter;
+					// 	prevTotout = totout;
 						
-						recordCounter = prevRecordCounter + tempRecordCounter - recordCounter;
-						index.AddPoint(strm.DataType & 7, totin, totout, strm.AvailOut, window);
-					}
-					else {
-						// outByteCounter += (len - (int)strm.AvailOut); // plan B: manually count bytes 
-						outByteCounter = totout - prevTotout;
+					// 	recordCounter = prevRecordCounter + tempRecordCounter - recordCounter;
+					// 	index.AddPoint(strm.DataType & 7, totin, totout, strm.AvailOut, window);
+					// }
+					// else {
+					// 	// outByteCounter += (len - (int)strm.AvailOut); // plan B: manually count bytes 
+					// 	outByteCounter = totout - prevTotout;
 
-						// Edge case: when decompressing the last part of NextIn, it is possible that the output (i.e., uncompressed data) 
-						// from that part is not able to fill the entire 32K in NextOut. In this case, the first NextOut from the next NextIn 
-						// will be the same as the current NextOut. Thus, we need to pay attention not to recount recordCounter and totout.
-						if (strm.AvailOut > 0) 
-						{
+					// 	// Edge case: when decompressing the last part of NextIn, it is possible that the output (i.e., uncompressed data) 
+					// 	// from that part is not able to fill the entire 32K in NextOut. In this case, the first NextOut from the next NextIn 
+					// 	// will be the same as the current NextOut. Thus, we need to pay attention not to recount recordCounter and totout.
+					// 	if (strm.AvailOut > 0) 
+					// 	{
 							
-							recordCounter = prevRecordCounter;
+					// 		recordCounter = prevRecordCounter;
 						
-						}
+					// 	}
 
-					}
+					// }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 					prevRecordCounter = recordCounter;
 
 					// if at end of block, consider adding an index entry (note that if
@@ -241,6 +285,24 @@ public static class Core
 					// 	last = totout;
 					// }
 				} while (strm.AvailIn != 0);
+			
+				if (hasPoint)
+				{
+					SingleByteReadingModeByteCounter++;
+					if (SingleByteReadingModeByteCounter < (int)CHUNK)
+					{
+						inputBufferCounter--;	
+					}
+					else
+					{
+						SingleByteReadingModeByteCounter = 0;
+					}
+				}
+				else 
+				{
+					SingleByteReadingModeByteCounter = 0;
+				}
+				
 			} while (ret != ZResult.STREAM_END);
 
 			// index.length = totout;
@@ -262,6 +324,7 @@ public static class Core
 		int recordCounter = 0;
 		int inputBufferCounter = 0;
 		int prevRecordCounter = 0;
+		int prevAvailOut = 0;
 
 		try
 		{
@@ -339,37 +402,47 @@ public static class Core
 					int tempOutByteCounter = 0; // for the ending buffer
 					int tempRecordCounter = 0; // for the ending buffer
 					var len = strm.NextOut.Length;
-					for (int i = 0; i < len-strm.AvailOut; i++)
+					
+					for (int i = (inputBufferCounter != 1 && prevAvailOut != 0) ? len-prevAvailOut : 0; i < len-strm.AvailOut; i++)
 					{
 						var c = strm.NextOut[i];
 						// '@' = 64
 						if (c == 64)
 						{
-							tempRecordCounter++;
-							if (recordCounter < index.ChunkSize)
-								recordCounter++;
-						}
-
-						if (tempRecordCounter <= index.ChunkSize)
-						{
-							tempOutByteCounter++;
+							recordCounter++;
+							if (recordCounter == index.ChunkSize + 1)
+							{
+								pointAppearsInInputBuffer.Add(inputBufferCounter);
+								recordCounter = 1;
+							}
 						}
 					}
 					
-					if (recordCounter == index.ChunkSize) {
-						pointAppearsInInputBuffer.Add(inputBufferCounter);
-						recordCounter = 0;
+					
+					if (strm.AvailOut > 0)
+					{
+						prevAvailOut = (int)strm.AvailOut;
 					}
-					else {
-						if (strm.AvailOut > 0) 
-						{
-							// if not the last one
-							recordCounter = prevRecordCounter;
-						
-						}
+					else 
+					{
+						prevAvailOut = 0;
+					}
+					// if (recordCounter > index.ChunkSize) {
+					// 	pointAppearsInInputBuffer.Add(inputBufferCounter);
+					// 	recordCounter = 0;
+					// }
+					// else {
+					// 	if (strm.AvailOut > 0) 
+					// 	{
+					// 		// if not the last one
+					// 		recordCounter = prevRecordCounter;
+					// 	}
+					// }
 
-					}
 					prevRecordCounter = recordCounter;
+				
+				
+				
 				} while (strm.AvailIn != 0);
 			} while (ret != ZResult.STREAM_END);
 

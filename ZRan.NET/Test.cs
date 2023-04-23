@@ -8,7 +8,8 @@ using System.Text;
 
 var testFile = "../Gzipped_FASTQ_Files/SRR11192680.fastq.gz";
 using var fs = File.OpenRead(testFile);
-Core.BuildDeflateIndex(fs, Constants.SPAN, 460);
+Core.BuildDeflateIndex(fs, Constants.SPAN, 600);
+// Core.BuildDeflateIndex(fs, Constants.SPAN, 200);
 
 // var fileName = "../Gzipped_FASTQ_Files/SRR11192680.fastq.gz";
 // // var fileName = "../Gzipped_FASTQ_Files/tests/gplv3.txt.gz";
