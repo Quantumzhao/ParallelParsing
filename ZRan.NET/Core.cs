@@ -19,8 +19,13 @@ public static class Core
 	public static Index BuildDeflateIndex(FileStream file, long span, uint chunksize)
 	{
 		List<int> pointAppearsInInputBuffer = new List<int>();
-		BuildDeflateIndex2(file, span, chunksize, pointAppearsInInputBuffer);
+		GetInputBufferIndexForSlowerRead(file, span, chunksize, pointAppearsInInputBuffer);
 		file.Position = 0;
+
+		foreach (int idx in pointAppearsInInputBuffer)
+		{
+			Console.WriteLine(idx);
+		}
 
 		ZStream strm = new();
 		Index index = new Index(chunksize);
@@ -33,6 +38,7 @@ public static class Core
 		long outByteCounter = 0;
 		long prevTotout = 0;
 		int inputBufferCounter = 0;
+		int SingleByteReadingModeByteCounter = 0;
 
 		try
 		{
@@ -59,9 +65,27 @@ public static class Core
 				inputBufferCounter++;
 				bool hasPoint = pointAppearsInInputBuffer.Contains(inputBufferCounter);
 
+				strm.AvailIn = (uint)file.Read(input, 0, hasPoint ? 1 : (int)CHUNK);
+				
+				if (hasPoint)
+				{
+					SingleByteReadingModeByteCounter++;
+					if (SingleByteReadingModeByteCounter < (int)CHUNK)
+					{
+						inputBufferCounter--;	
+					}
+					else
+					{
+						SingleByteReadingModeByteCounter = 0;
+					}
+				}
+				else 
+				{
+					SingleByteReadingModeByteCounter = 0;
+				}
+				
 				// get some compressed data from input file
-				// strm.AvailIn = (uint)file.Read(input, 0, hasPoint ? 1 : (int)CHUNK);
-				strm.AvailIn = (uint)file.Read(input, 0, (int)CHUNK);
+				// strm.AvailIn = (uint)file.Read(input, 0, (int)CHUNK);
 
 				if (strm.AvailIn == 0)
 				{
@@ -107,7 +131,10 @@ public static class Core
 					// strm.NextIn.Print((int)strm.AvailIn);
 					// Console.WriteLine("after inflate:");				
 					ret = Inflate(strm, ZFlush.BLOCK);
-					// strm.NextOut.Print(2048);
+					// Console.WriteLine("---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
+					// strm.NextOut.PrintASCII(128);
+					// strm.NextOut.PrintASCII((int)(strm.NextOut.Length - strm.AvailOut));
+					// strm.NextOut.PrintASCIIFirstAndLast(256);
 					// strm.NextIn.Print((int)strm.AvailIn);
 
 
@@ -130,6 +157,8 @@ public static class Core
 						break;
 					}
 
+
+					//-----------------------------------------------------------------------------------------------------------------
 					int tempOutByteCounter = 0; // for the ending buffer
 					int tempRecordCounter = 0; // for the ending buffer
 					var len = strm.NextOut.Length;
@@ -159,19 +188,31 @@ public static class Core
 					//		* totout
 					//		* window
 					if (recordCounter == index.ChunkSize) {
-						// inByteCounter = (int)(totin + strm.AvailIn);
+						if (strm.AvailOut > 0)
+						{
+
+						}
+						else 
+						{
+
+						}
+						strm.NextOut.PrintASCII(10240);
 						outByteCounter += tempOutByteCounter;
 						prevTotout = totout;
 						
-						// index.AddPoint(strm.DataType & 7, totin, totout, strm.AvailOut, window);
-						recordCounter = 0;
+						recordCounter = prevRecordCounter + tempRecordCounter - recordCounter;
+						index.AddPoint(strm.DataType & 7, totin, totout, strm.AvailOut, window);
 					}
 					else {
 						// outByteCounter += (len - (int)strm.AvailOut); // plan B: manually count bytes 
 						outByteCounter = totout - prevTotout;
+
+						// Edge case: when decompressing the last part of NextIn, it is possible that the output (i.e., uncompressed data) 
+						// from that part is not able to fill the entire 32K in NextOut. In this case, the first NextOut from the next NextIn 
+						// will be the same as the current NextOut. Thus, we need to pay attention not to recount recordCounter and totout.
 						if (strm.AvailOut > 0) 
 						{
-							// if not the last one
+							
 							recordCounter = prevRecordCounter;
 						
 						}
@@ -212,7 +253,7 @@ public static class Core
 		}
 	}
 
-	public static void BuildDeflateIndex2(FileStream file, long span, uint chunksize, List<int> pointAppearsInInputBuffer)
+	public static void GetInputBufferIndexForSlowerRead(FileStream file, long span, uint chunksize, List<int> pointAppearsInInputBuffer)
 	{
 		ZStream strm = new();
 		Index index = new Index(chunksize);
@@ -220,6 +261,7 @@ public static class Core
 		byte[] window = new byte[WINSIZE];
 		int recordCounter = 0;
 		int inputBufferCounter = 0;
+		int prevRecordCounter = 0;
 
 		try
 		{
@@ -269,8 +311,10 @@ public static class Core
 					totin += strm.AvailIn;
 					totout += strm.AvailOut;
 					
-					// return at end of block			
+					// return at end of block	
+					//--------------------------------------------------------		
 					ret = Inflate(strm, ZFlush.BLOCK);
+					//--------------------------------------------------------	
 					// strm.NextOut.Print(2048);
 
 					totin -= strm.AvailIn;
@@ -295,7 +339,7 @@ public static class Core
 					int tempOutByteCounter = 0; // for the ending buffer
 					int tempRecordCounter = 0; // for the ending buffer
 					var len = strm.NextOut.Length;
-					for (int i = 0; i < len; i++)
+					for (int i = 0; i < len-strm.AvailOut; i++)
 					{
 						var c = strm.NextOut[i];
 						// '@' = 64
@@ -316,6 +360,16 @@ public static class Core
 						pointAppearsInInputBuffer.Add(inputBufferCounter);
 						recordCounter = 0;
 					}
+					else {
+						if (strm.AvailOut > 0) 
+						{
+							// if not the last one
+							recordCounter = prevRecordCounter;
+						
+						}
+
+					}
+					prevRecordCounter = recordCounter;
 				} while (strm.AvailIn != 0);
 			} while (ret != ZResult.STREAM_END);
 

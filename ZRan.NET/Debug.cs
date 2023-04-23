@@ -11,4 +11,20 @@ internal static class Debug
 		}
 		Console.WriteLine();
 	}
+
+	public static void PrintASCII(this byte[] arr, int first)
+	{
+		Console.Write(System.Text.Encoding.UTF8.GetString(arr).Substring(0, first));
+		Console.WriteLine();
+	}
+
+	public static void PrintASCIIFirstAndLast(this byte[] arr, int first)
+	{
+		Console.WriteLine("------------------------- first " + first + " characters--------------------------");
+		Console.Write(System.Text.Encoding.UTF8.GetString(arr).Substring(0, first));
+		Console.WriteLine();
+		Console.WriteLine("-------------------------- last " + first + " characters--------------------------");
+		Console.Write(System.Text.Encoding.UTF8.GetString(arr).Substring(Math.Max(0, arr.Length - first)));
+		Console.WriteLine();
+	}
 }
