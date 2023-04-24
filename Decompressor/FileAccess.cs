@@ -12,21 +12,30 @@ public static class FileAccess
 
 }
 
-public sealed class LazyFileReadParallel : IEnumerable<byte[]>
+public abstract class LazyFileRead : IEnumerable<byte[]>, IDisposable
 {
-	public IEnumerator<byte[]> GetEnumerator()
+	public abstract void Dispose();
+	public abstract IEnumerator<byte[]> GetEnumerator();
+
+	IEnumerator IEnumerable.GetEnumerator() => this.GetEnumerator();
+}
+
+public sealed class LazyFileReadParallel : LazyFileRead
+{
+	public override void Dispose()
 	{
 		throw new NotImplementedException();
 	}
 
-	IEnumerator IEnumerable.GetEnumerator()
+	public override IEnumerator<byte[]> GetEnumerator()
 	{
 		throw new NotImplementedException();
 	}
 }
 
-public sealed class LazyFileReadSequential : IEnumerable<byte[]>
+public sealed class LazyFileReadSequential : LazyFileRead
 {
+	public override IEnumerator<byte[]> GetEnumerator() => _Enumerator;
 	private readonly FileReader _Enumerator;
 
 	public LazyFileReadSequential(Index index, string path)
@@ -35,9 +44,10 @@ public sealed class LazyFileReadSequential : IEnumerable<byte[]>
 		_Enumerator = new FileReader(index, file);
 	}
 
-	public IEnumerator<byte[]> GetEnumerator() => _Enumerator;
-
-	IEnumerator IEnumerable.GetEnumerator() => this.GetEnumerator();
+	public override void Dispose()
+	{
+		_Enumerator.Dispose();
+	}
 
 	private sealed class FileReader : IEnumerator<byte[]>
 	{
@@ -56,7 +66,7 @@ public sealed class LazyFileReadSequential : IEnumerable<byte[]>
 		public FileReader(Index index, FileStream file)
 		{
 			_Index = index;
-			_File = file;
+			_File = file; 
 			_BinReader = new BinaryReader(file);
 			_ListEnumerator = index.List.GetEnumerator();
 			_CurrPoint = new Point(0, 0, 0);
@@ -68,7 +78,6 @@ public sealed class LazyFileReadSequential : IEnumerable<byte[]>
 		private readonly IEnumerator<Point> _ListEnumerator;
 		private readonly Point _CurrPoint;
 
-
 		public void Dispose()
 		{
 			_BinReader.Dispose();
@@ -78,11 +87,11 @@ public sealed class LazyFileReadSequential : IEnumerable<byte[]>
 
 		public bool MoveNext()
 		{
-			var from = (int)(_ListEnumerator.Current?.Output ?? 0);
+			var from = (int)(_ListEnumerator.Current?.Input ?? 0);
 			
 			var ret = _ListEnumerator.MoveNext();
-			var to = (int)(_ListEnumerator.Current?.Output ?? _File.Length);
 			if (!ret) return false;
+			var to = (int)(_ListEnumerator.Current?.Input ?? _File.Length);
 
 			// ? might be problematic once file size > 2GB
 			var len = to - from;

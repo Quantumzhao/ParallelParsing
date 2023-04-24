@@ -4,7 +4,6 @@ using System.Text;
 using ParallelParsing.ZRan.NET;
 using Index = ParallelParsing.ZRan.NET.Index;
 using System.IO.Compression;
-using System.Text;
 
 var testFile = "t.gz";
 using var fs = File.OpenRead(testFile);

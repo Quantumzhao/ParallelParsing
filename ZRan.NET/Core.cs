@@ -50,7 +50,7 @@ public static class Core
 			do
 			{
 				// get some compressed data from input file
-				strm.AvailIn = (uint)file.Read(input, 0, (int)CHUNK);
+				strm.AvailIn = (uint)file.Read(input, 0, (int)16);
 
 				if (strm.AvailIn == 0)
 				{

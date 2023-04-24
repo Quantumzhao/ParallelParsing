@@ -10,7 +10,9 @@ public sealed class Decompressor
 		bool enableSsdOptimization = false)
 	{
 		var index = IndexIO.Deserialize(indexPath);
-		var reader = new LazyFileReadSequential(index, gzipPath);
+		LazyFileRead reader = enableSsdOptimization ?
+							  new LazyFileReadParallel() :
+							  new LazyFileReadSequential(index, gzipPath);
 		var allRecords = new List<FASTQRecord>();
 
 		// assume the output bytes are exactly aligned, no more, no less
