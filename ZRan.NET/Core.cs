@@ -18,14 +18,18 @@ public static class Core
 	/// </param>
 	public static Index BuildDeflateIndex(FileStream file, long span, uint chunksize)
 	{
+		// Find in which "NextIn"s the checkpoints are going to appear
 		List<int> pointAppearsInInputBuffer = new List<int>();
 		GetInputBufferIndexForSlowerRead(file, span, chunksize, pointAppearsInInputBuffer);
+		
+		// foreach (int idx in pointAppearsInInputBuffer)
+		// {
+		// 	Console.WriteLine(idx);
+		// }
+
+		// Reset file stream position for a new round of reading
 		file.Position = 0;
 
-		foreach (int idx in pointAppearsInInputBuffer)
-		{
-			Console.WriteLine(idx);
-		}
 
 		ZStream strm = new();
 		Index index = new Index(chunksize);
@@ -33,9 +37,9 @@ public static class Core
 		byte[] window = new byte[WINSIZE];
 		byte[] tempWindow = new byte[WINSIZE];
 		int recordCounter = 0;
-		int prevRecordCounter = 0;
-		long inByteCounter = 0;
-		long outByteCounter = 0;
+		// int prevRecordCounter = 0;
+		// long inByteCounter = 0;
+		// long outByteCounter = 0;
 		long prevTotout = 0;
 		int inputBufferCounter = 0;
 		int SingleByteReadingModeByteCounter = 0;
@@ -144,28 +148,64 @@ public static class Core
 
 
 					//-----------------------------------------------------------------------------------------------------------------
-					int tempOutByteCounter = 0; // for the ending buffer
-					int tempRecordCounter = 0; // for the ending buffer
+					// int tempOutByteCounter = 0; // for the ending buffer
+					// int tempRecordCounter = 0; // for the ending buffer
 					var len = strm.NextOut.Length;
 					
 					
+					int bytesBeforeTargetAt = 0;
+
 					
+
 					for (int i = ((hasPoint && prevAvailOut != 0) || (inputBufferCounter != 0 && prevAvailOut != 0)) ? len-prevAvailOut : 0; 
 						i < len-strm.AvailOut; i++)
 					{
 						var c = strm.NextOut[i];
+
+						if (c != 64)
+						{
+							bytesBeforeTargetAt++;
+						}
+
 						// '@' = 64
 						if (c == 64)
 						{
 							recordCounter++;
 							if (recordCounter == index.ChunkSize + 1)
 							{
-								index.AddPoint(strm.DataType & 7, totin, totout, strm.AvailOut, window);
+								long tempTotin = 0;
+								long tempTotout = 0;
+								int tempLength = len - (int)strm.AvailOut - (((hasPoint && prevAvailOut != 0) || (inputBufferCounter != 0 && prevAvailOut != 0)) ? len-prevAvailOut : 0);
+								
+								// ASSUME THE END OF A RECORD IS NEW LINE 
+								if (bytesBeforeTargetAt == 0)
+								{
+									tempTotin = totin - 1;
+									tempTotout = prevTotout;
+								}
+								else if (bytesBeforeTargetAt > 0)
+								{
+									tempTotin = totin;
+									tempTotout = totout - (tempLength - bytesBeforeTargetAt);
+								}
+
+								index.AddPoint(strm.DataType & 7, tempTotin, tempTotout, strm.AvailOut, window);
 								recordCounter = 1;
+								// strm.NextOut.PrintASCII(1000);
+								Console.WriteLine("Add point----------------------------------------");
+								Console.WriteLine("prevTotout: " + prevTotout);
+								Console.WriteLine("length: " + tempLength);
+								Console.WriteLine("totin:  " + tempTotin);
+								Console.WriteLine("totout: " + tempTotout);
+								strm.NextOut.PrintASCIIFromTo((((hasPoint && prevAvailOut != 0) || (inputBufferCounter != 0 && prevAvailOut != 0)) ? len-prevAvailOut : 0), tempLength);
+
 							}
+							// strm.NextOut.PrintASCIIFromTo((((hasPoint && prevAvailOut != 0) || (inputBufferCounter != 0 && prevAvailOut != 0)) ? len-prevAvailOut : 0), len-(int)strm.AvailOut-(((hasPoint && prevAvailOut != 0) || (inputBufferCounter != 0 && prevAvailOut != 0)) ? len-prevAvailOut : 0));
 						}
 						
 					}
+
+					prevTotout = totout;
 					
 					// strm.NextOut.PrintASCIIFromTo((inputBufferCounter != 0 && hasPoint && prevAvailOut != 0) ? len-prevAvailOut : 0, len-(int)strm.AvailOut-((inputBufferCounter != 0 && hasPoint && prevAvailOut != 0) ? len-prevAvailOut : 0));
 
@@ -177,26 +217,6 @@ public static class Core
 					{
 						prevAvailOut = 0;
 					}
-					
-					
-					
-					
-					
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 					
 					// for (int i = 0; i < len; i++)
 					// {
@@ -262,7 +282,7 @@ public static class Core
 
 
 
-					prevRecordCounter = recordCounter;
+					// prevRecordCounter = recordCounter;
 
 					// if at end of block, consider adding an index entry (note that if
 					// data_type indicates an end-of-block, then all of the
