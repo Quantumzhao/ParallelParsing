@@ -35,14 +35,35 @@ public static class Core
 		Index index = new Index(chunksize);
 		byte[] input = new byte[CHUNK];
 		byte[] window = new byte[WINSIZE];
-		byte[] tempWindow = new byte[WINSIZE];
-		int recordCounter = 0;
+
+		// window from the previous iteration
+		byte[] prevWindow = new byte[WINSIZE];
+
 		// int prevRecordCounter = 0;
 		// long inByteCounter = 0;
 		// long outByteCounter = 0;
+
+		// Count records so we know where/when to add a point
+		int recordCounter = 0;
+		
+		// totout from the previous iteration
 		long prevTotout = 0;
+
+		// Keep track of which NextIn is being read. Switch to single byte
+		// reading mode if the NextIn contains point position. 
 		int inputBufferCounter = 0;
+
+		// When in single byte reading mode, treat those 16k reads as one
+		// so that inputBufferCount will only increment once.
 		int SingleByteReadingModeByteCounter = 0;
+
+		/* Edge case: when decompressing the last iteration of NextIn, it is 
+		   possible that the output (i.e., uncompressed data) from that 
+		   iteration is not able to fill the entire 32K in NextOut. In this 
+		   case, the first NextOut from the next NextIn will be the same as 
+		   the current NextOut. Thus, we need to pay attention not to recount 
+		   things like recordCounter and totout. */
+		// prevAvailOut is used to indicate this edge case.
 		int prevAvailOut = 0;
 
 		try
@@ -126,6 +147,7 @@ public static class Core
 					// strm.NextOut.PrintASCIIFirstAndLast(256);
 					// strm.NextIn.Print((int)strm.AvailIn);
 
+		
 
 					totin -= strm.AvailIn;
 					totout -= strm.AvailOut;
@@ -175,7 +197,10 @@ public static class Core
 							{
 								long tempTotin = 0;
 								long tempTotout = 0;
+								byte[] tempWindow = new byte[WINSIZE];
 								int tempLength = len - (int)strm.AvailOut - (((hasPoint && prevAvailOut != 0) || (inputBufferCounter != 0 && prevAvailOut != 0)) ? len-prevAvailOut : 0);
+								int bytesToCopyFromPrev = 0;
+								int usefulBytesInCurrentWindow = 0;
 								
 								// ASSUME THE END OF A RECORD IS NEW LINE 
 								if (bytesBeforeTargetAt == 0)
@@ -189,26 +214,33 @@ public static class Core
 									tempTotout = totout - (tempLength - bytesBeforeTargetAt);
 								}
 
-								index.AddPoint(strm.DataType & 7, tempTotin, tempTotout, strm.AvailOut, window);
+								usefulBytesInCurrentWindow = (int)tempTotout % (int)WINSIZE;
+								bytesToCopyFromPrev = (int)WINSIZE - (int)usefulBytesInCurrentWindow;
+								Array.Copy(prevWindow, usefulBytesInCurrentWindow, tempWindow, 0, bytesToCopyFromPrev);
+								Array.Copy(window, 0, tempWindow, bytesToCopyFromPrev, usefulBytesInCurrentWindow);
+
+								index.AddPoint(strm.DataType & 7, tempTotin, tempTotout, strm.AvailOut, tempWindow);
 								recordCounter = 1;
 								// strm.NextOut.PrintASCII(1000);
-								Console.WriteLine("Add point----------------------------------------");
-								Console.WriteLine("prevTotout: " + prevTotout);
-								Console.WriteLine("length: " + tempLength);
-								Console.WriteLine("totin:  " + tempTotin);
-								Console.WriteLine("totout: " + tempTotout);
-								strm.NextOut.PrintASCIIFromTo((((hasPoint && prevAvailOut != 0) || (inputBufferCounter != 0 && prevAvailOut != 0)) ? len-prevAvailOut : 0), tempLength);
+								// Console.WriteLine("Add point----------------------------------------");
+								// Console.WriteLine("prevTotout: " + prevTotout);
+								// Console.WriteLine("length: " + tempLength);
+								// Console.WriteLine("totin:  " + tempTotin);
+								// Console.WriteLine("totout: " + tempTotout);
+								// strm.NextOut.PrintASCIIFromTo((((hasPoint && prevAvailOut != 0) || (inputBufferCounter != 0 && prevAvailOut != 0)) ? len-prevAvailOut : 0), tempLength);
+								
+								Console.WriteLine("--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
+								tempWindow.PrintASCII(32*1024);
 
 							}
-							// strm.NextOut.PrintASCIIFromTo((((hasPoint && prevAvailOut != 0) || (inputBufferCounter != 0 && prevAvailOut != 0)) ? len-prevAvailOut : 0), len-(int)strm.AvailOut-(((hasPoint && prevAvailOut != 0) || (inputBufferCounter != 0 && prevAvailOut != 0)) ? len-prevAvailOut : 0));
+							// 
 						}
 						
 					}
 
 					prevTotout = totout;
+					Array.Copy(window, prevWindow, WINSIZE);
 					
-					// strm.NextOut.PrintASCIIFromTo((inputBufferCounter != 0 && hasPoint && prevAvailOut != 0) ? len-prevAvailOut : 0, len-(int)strm.AvailOut-((inputBufferCounter != 0 && hasPoint && prevAvailOut != 0) ? len-prevAvailOut : 0));
-
 					if (strm.AvailOut > 0)
 					{
 						prevAvailOut = (int)strm.AvailOut;
