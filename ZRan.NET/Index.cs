@@ -20,11 +20,14 @@ public class Index
 	{
 		Point next = new Point(output, input, bits);
 
-		if (left != 0)
-			Array.Copy(window, WINSIZE - left, next.Window, 0, left);
+		// if (left != 0)
+		// 	Array.Copy(window, WINSIZE - left, next.Window, 0, left);
 			
-		if (left < WINSIZE)
-			Array.Copy(window, 0, next.Window, left, WINSIZE - left);
+		// if (left < WINSIZE)
+		// 	Array.Copy(window, 0, next.Window, left, WINSIZE - left);
+
+		Array.Copy(window, next.Window, WINSIZE);
+		
 		this.List.Add(next);
 	}
 }

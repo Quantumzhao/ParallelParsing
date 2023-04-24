@@ -18,14 +18,53 @@ public static class Core
 	/// </param>
 	public static Index BuildDeflateIndex(FileStream file, long span, uint chunksize)
 	{
+		// Find in which "NextIn"s the checkpoints are going to appear
+		List<int> pointAppearsInInputBuffer = new List<int>();
+		GetInputBufferIndexForSlowerRead(file, span, chunksize, pointAppearsInInputBuffer);
+		
+		// foreach (int idx in pointAppearsInInputBuffer)
+		// {
+		// 	Console.WriteLine(idx);
+		// }
+
+		// Reset file stream position for a new round of reading
+		file.Position = 0;
+
+
 		ZStream strm = new();
 		Index index = new Index(chunksize);
 		byte[] input = new byte[CHUNK];
 		byte[] window = new byte[WINSIZE];
-		byte[] tempWindow = new byte[WINSIZE];
+
+		// window from the previous iteration
+		byte[] prevWindow = new byte[WINSIZE];
+
+		// int prevRecordCounter = 0;
+		// long inByteCounter = 0;
+		// long outByteCounter = 0;
+
+		// Count records so we know where/when to add a point
 		int recordCounter = 0;
-		int inByteCounter = 0;
-		int outByteCounter = 0;
+		
+		// totout from the previous iteration
+		long prevTotout = 0;
+
+		// Keep track of which NextIn is being read. Switch to single byte
+		// reading mode if the NextIn contains point position. 
+		int inputBufferCounter = 0;
+
+		// When in single byte reading mode, treat those 16k reads as one
+		// so that inputBufferCount will only increment once.
+		int SingleByteReadingModeByteCounter = 0;
+
+		/* Edge case: when decompressing the last iteration of NextIn, it is 
+		   possible that the output (i.e., uncompressed data) from that 
+		   iteration is not able to fill the entire 32K in NextOut. In this 
+		   case, the first NextOut from the next NextIn will be the same as 
+		   the current NextOut. Thus, we need to pay attention not to recount 
+		   things like recordCounter and totout. */
+		// prevAvailOut is used to indicate this edge case.
+		int prevAvailOut = 0;
 
 		try
 		{
@@ -49,15 +88,21 @@ public static class Core
 			// information in the gzip or zlib stream
 			do
 			{
+				inputBufferCounter++;
+				bool hasPoint = pointAppearsInInputBuffer.Contains(inputBufferCounter);
+
+				strm.AvailIn = (uint)file.Read(input, 0, hasPoint ? 1 : (int)CHUNK);
+				
+				
 				// get some compressed data from input file
-				strm.AvailIn = (uint)file.Read(input, 0, (int)16);
+				// strm.AvailIn = (uint)file.Read(input, 0, (int)CHUNK);
 
 				if (strm.AvailIn == 0)
 				{
 					throw new ZException(ZResult.DATA_ERROR);
 				}
 				strm.NextIn = input;
-
+				
 				// process all of that, or until end of stream
 				do
 				{
@@ -91,15 +136,305 @@ public static class Core
 					// * data_type is set as noted here every time inflate() returns 
 					// * for all flush options, and so can be used to determine the amount of 
 					// * currently consumed input in bits. 
-					// return at end of block
-					strm.NextOut.Print((int)strm.AvailOut);
-					strm.NextIn.Print((int)strm.AvailIn);
-					Console.WriteLine("after inflate:");				
+					// // return at end of block
+					// strm.NextOut.Print((int)strm.AvailOut);
+					// strm.NextIn.Print((int)strm.AvailIn);
+					// Console.WriteLine("after inflate:");				
 					ret = Inflate(strm, ZFlush.BLOCK);
-					strm.NextOut.Print((int)strm.AvailOut);
-					strm.NextIn.Print((int)strm.AvailIn);
+					// Console.WriteLine("---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
+					// strm.NextOut.PrintASCII(128);
+					// strm.NextOut.PrintASCII((int)(strm.NextOut.Length - strm.AvailOut));
+					// strm.NextOut.PrintASCIIFirstAndLast(256);
+					// strm.NextIn.Print((int)strm.AvailIn);
+
+		
+
 					totin -= strm.AvailIn;
 					totout -= strm.AvailOut;
+
+					if (ret == ZResult.NEED_DICT ||
+						ret == ZResult.MEM_ERROR ||
+						ret == ZResult.DATA_ERROR)
+						throw new ZException(ret);
+					if (ret == ZResult.STREAM_END)
+					{
+						if (strm.AvailIn != 0 || file.Position != file.Length)
+						{
+							ret = InflateReset(strm);
+							if (ret != ZResult.OK)
+								throw new ZException(ret);
+							continue;
+						}
+						break;
+					}
+
+
+					//-----------------------------------------------------------------------------------------------------------------
+					// int tempOutByteCounter = 0; // for the ending buffer
+					// int tempRecordCounter = 0; // for the ending buffer
+					var len = strm.NextOut.Length;
+					
+					
+					int bytesBeforeTargetAt = 0;
+
+					
+
+					for (int i = ((hasPoint && prevAvailOut != 0) || (inputBufferCounter != 0 && prevAvailOut != 0)) ? len-prevAvailOut : 0; 
+						i < len-strm.AvailOut; i++)
+					{
+						var c = strm.NextOut[i];
+
+						if (c != 64)
+						{
+							bytesBeforeTargetAt++;
+						}
+
+						// '@' = 64
+						if (c == 64)
+						{
+							recordCounter++;
+							if (recordCounter == index.ChunkSize + 1)
+							{
+								long tempTotin = 0;
+								long tempTotout = 0;
+								byte[] tempWindow = new byte[WINSIZE];
+								int tempLength = len - (int)strm.AvailOut - (((hasPoint && prevAvailOut != 0) || (inputBufferCounter != 0 && prevAvailOut != 0)) ? len-prevAvailOut : 0);
+								int bytesToCopyFromPrev = 0;
+								int usefulBytesInCurrentWindow = 0;
+								
+								// ASSUME THE END OF A RECORD IS NEW LINE 
+								if (bytesBeforeTargetAt == 0)
+								{
+									tempTotin = totin - 1;
+									tempTotout = prevTotout;
+								}
+								else if (bytesBeforeTargetAt > 0)
+								{
+									tempTotin = totin;
+									tempTotout = totout - (tempLength - bytesBeforeTargetAt);
+								}
+
+								usefulBytesInCurrentWindow = (int)tempTotout % (int)WINSIZE;
+								bytesToCopyFromPrev = (int)WINSIZE - (int)usefulBytesInCurrentWindow;
+								Array.Copy(prevWindow, usefulBytesInCurrentWindow, tempWindow, 0, bytesToCopyFromPrev);
+								Array.Copy(window, 0, tempWindow, bytesToCopyFromPrev, usefulBytesInCurrentWindow);
+
+								index.AddPoint(strm.DataType & 7, tempTotin, tempTotout, strm.AvailOut, tempWindow);
+								recordCounter = 1;
+								// strm.NextOut.PrintASCII(1000);
+								// Console.WriteLine("Add point----------------------------------------");
+								// Console.WriteLine("prevTotout: " + prevTotout);
+								// Console.WriteLine("length: " + tempLength);
+								// Console.WriteLine("totin:  " + tempTotin);
+								// Console.WriteLine("totout: " + tempTotout);
+								// strm.NextOut.PrintASCIIFromTo((((hasPoint && prevAvailOut != 0) || (inputBufferCounter != 0 && prevAvailOut != 0)) ? len-prevAvailOut : 0), tempLength);
+								
+								Console.WriteLine("--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
+								tempWindow.PrintASCII(32*1024);
+
+							}
+							// 
+						}
+						
+					}
+
+					prevTotout = totout;
+					Array.Copy(window, prevWindow, WINSIZE);
+					
+					if (strm.AvailOut > 0)
+					{
+						prevAvailOut = (int)strm.AvailOut;
+					}
+					else 
+					{
+						prevAvailOut = 0;
+					}
+					
+					// for (int i = 0; i < len; i++)
+					// {
+					// 	var c = strm.NextOut[i];
+					// 	// '@' = 64
+					// 	if (c == 64)
+					// 	{
+					// 		tempRecordCounter++;
+					// 		if (recordCounter < index.ChunkSize)
+					// 			recordCounter++;
+					// 	}
+
+					// 	if (tempRecordCounter <= index.ChunkSize)
+					// 	{
+					// 		tempOutByteCounter++;
+					// 	}
+					// }
+
+					// if (recordCounter == index.ChunkSize) {
+					// 	if (strm.AvailOut > 0)
+					// 	{
+
+					// 	}
+					// 	else 
+					// 	{
+
+					// 	}
+					// 	strm.NextOut.PrintASCII(10240);
+					// 	outByteCounter += tempOutByteCounter;
+					// 	prevTotout = totout;
+						
+					// 	recordCounter = prevRecordCounter + tempRecordCounter - recordCounter;
+					// 	index.AddPoint(strm.DataType & 7, totin, totout, strm.AvailOut, window);
+					// }
+					// else {
+					// 	// outByteCounter += (len - (int)strm.AvailOut); // plan B: manually count bytes 
+					// 	outByteCounter = totout - prevTotout;
+
+					// 	// Edge case: when decompressing the last part of NextIn, it is possible that the output (i.e., uncompressed data) 
+					// 	// from that part is not able to fill the entire 32K in NextOut. In this case, the first NextOut from the next NextIn 
+					// 	// will be the same as the current NextOut. Thus, we need to pay attention not to recount recordCounter and totout.
+					// 	if (strm.AvailOut > 0) 
+					// 	{
+							
+					// 		recordCounter = prevRecordCounter;
+						
+					// 	}
+
+					// }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+					// prevRecordCounter = recordCounter;
+
+					// if at end of block, consider adding an index entry (note that if
+					// data_type indicates an end-of-block, then all of the
+					// uncompressed data from that block has been delivered, and none
+					// of the compressed data after that block has been consumed,
+					// except for up to seven bits) -- the totout == 0 provides an
+					// entry point after the zlib or gzip header, and assures that the
+					// index always has at least one access point; we avoid creating an
+					// access point after the last block by checking bit 6 of data_type
+					// * strm.DataType: the number of unused bits 
+					// * in the last byte taken from strm->next_in
+					// * +64 if inflate() is currently decoding the last block in the deflate stream
+					// * +128 if inflate() returned immediately after decoding an end-of-block code
+					// *      or decoding the complete header up to just before the first byte 
+					// *      of the deflate stream
+					// if ((strm.DataType & 128) != 0 && (strm.DataType & 64) == 0 &&
+					// 	(totout == 0 || totout - last > span))
+					// {
+					// 	index.AddPoint(strm.DataType & 7, totin, totout, strm.AvailOut, window);
+					// 	last = totout;
+					// }
+				} while (strm.AvailIn != 0);
+			
+				if (hasPoint)
+				{
+					SingleByteReadingModeByteCounter++;
+					if (SingleByteReadingModeByteCounter < (int)CHUNK)
+					{
+						inputBufferCounter--;	
+					}
+					else
+					{
+						SingleByteReadingModeByteCounter = 0;
+					}
+				}
+				else 
+				{
+					SingleByteReadingModeByteCounter = 0;
+				}
+				
+			} while (ret != ZResult.STREAM_END);
+
+			// index.length = totout;
+			return index;
+		}
+		finally
+		{
+			// clean up and return index (release unused entries in list)
+			InflateEnd(strm);
+		}
+	}
+
+	public static void GetInputBufferIndexForSlowerRead(FileStream file, long span, uint chunksize, List<int> pointAppearsInInputBuffer)
+	{
+		ZStream strm = new();
+		Index index = new Index(chunksize);
+		byte[] input = new byte[CHUNK];
+		byte[] window = new byte[WINSIZE];
+		int recordCounter = 0;
+		int inputBufferCounter = 0;
+		int prevRecordCounter = 0;
+		int prevAvailOut = 0;
+
+		try
+		{
+			ZResult ret;
+			// our own total counters to avoid 4GB limit
+			long totin = 0;
+			long totout = 0;
+			// totout value of last access point
+			long last = 0;
+
+			// 47: enable zlib and gzip decoding with automatic header detection
+			ret = InflateInit(strm, 47);
+			if (ret != ZResult.OK)
+			{
+				throw new ZException(ret);
+			}
+			strm.AvailOut = 0;
+
+			// inflate the input, maintain a sliding window, and build an index -- this
+			// also validates the integrity of the compressed data using the check
+			// information in the gzip or zlib stream
+			do
+			{
+				inputBufferCounter++;
+
+				// get some compressed data from input file
+				strm.AvailIn = (uint)file.Read(input, 0, (int)CHUNK);
+
+				if (strm.AvailIn == 0)
+				{
+					throw new ZException(ZResult.DATA_ERROR);
+				}
+				strm.NextIn = input;
+				
+				// process all of that, or until end of stream
+				do
+				{
+					// reset sliding window if necessary
+					if (strm.AvailOut == 0)
+					{
+						strm.AvailOut = WINSIZE;
+						strm.NextOut = window;
+					}
+
+					// inflate until out of input, output, or at end of block --
+					// update the total input and output counters
+					totin += strm.AvailIn;
+					totout += strm.AvailOut;
+					
+					// return at end of block	
+					//--------------------------------------------------------		
+					ret = Inflate(strm, ZFlush.BLOCK);
+					//--------------------------------------------------------	
+					// strm.NextOut.Print(2048);
+
+					totin -= strm.AvailIn;
+					totout -= strm.AvailOut;
+
 					if (ret == ZResult.NEED_DICT ||
 						ret == ZResult.MEM_ERROR ||
 						ret == ZResult.DATA_ERROR)
@@ -119,62 +454,52 @@ public static class Core
 					int tempOutByteCounter = 0; // for the ending buffer
 					int tempRecordCounter = 0; // for the ending buffer
 					var len = strm.NextOut.Length;
-					for (int i = 0; i < len; i++)
+					
+					for (int i = (inputBufferCounter != 1 && prevAvailOut != 0) ? len-prevAvailOut : 0; i < len-strm.AvailOut; i++)
 					{
 						var c = strm.NextOut[i];
 						// '@' = 64
 						if (c == 64)
 						{
-							tempRecordCounter++;
-							if (recordCounter < index.ChunkSize)
-								recordCounter++;
-						}
-
-						if (tempRecordCounter <= index.ChunkSize)
-						{
-							tempOutByteCounter++;
+							recordCounter++;
+							if (recordCounter == index.ChunkSize + 1)
+							{
+								pointAppearsInInputBuffer.Add(inputBufferCounter);
+								recordCounter = 1;
+							}
 						}
 					}
-
-					// * Things to do:
-					// 		* recordCounter
-					// 		* inByteCounter
-					// 		* outByteCounter
-					//		* window
-					if (recordCounter == index.ChunkSize) {
-						// inByteCounter = ?;
-						outByteCounter += tempOutByteCounter;
-						index.AddPoint(strm.DataType & 7, totin, totout, strm.AvailOut, window);
-					}
-					else {
-						outByteCounter += (len - (int)strm.AvailOut); // plan B: manually count bytes 
-					}
-
-					// if at end of block, consider adding an index entry (note that if
-					// data_type indicates an end-of-block, then all of the
-					// uncompressed data from that block has been delivered, and none
-					// of the compressed data after that block has been consumed,
-					// except for up to seven bits) -- the totout == 0 provides an
-					// entry point after the zlib or gzip header, and assures that the
-					// index always has at least one access point; we avoid creating an
-					// access point after the last block by checking bit 6 of data_type
-					// * strm.DataType: the number of unused bits 
-					// * in the last byte taken from strm->next_in
-					// * +64 if inflate() is currently decoding the last block in the deflate stream
-					// * +128 if inflate() returned immediately after decoding an end-of-block code
-					// *      or decoding the complete header up to just before the first byte 
-					// *      of the deflate stream
-					if ((strm.DataType & 128) != 0 && (strm.DataType & 64) == 0 &&
-						(totout == 0 || totout - last > span))
+					
+					
+					if (strm.AvailOut > 0)
 					{
-						index.AddPoint(strm.DataType & 7, totin, totout, strm.AvailOut, window);
-						last = totout;
+						prevAvailOut = (int)strm.AvailOut;
 					}
+					else 
+					{
+						prevAvailOut = 0;
+					}
+					// if (recordCounter > index.ChunkSize) {
+					// 	pointAppearsInInputBuffer.Add(inputBufferCounter);
+					// 	recordCounter = 0;
+					// }
+					// else {
+					// 	if (strm.AvailOut > 0) 
+					// 	{
+					// 		// if not the last one
+					// 		recordCounter = prevRecordCounter;
+					// 	}
+					// }
+
+					prevRecordCounter = recordCounter;
+				
+				
+				
 				} while (strm.AvailIn != 0);
 			} while (ret != ZResult.STREAM_END);
 
 			// index.length = totout;
-			return index;
+			
 		}
 		finally
 		{
@@ -182,6 +507,7 @@ public static class Core
 			InflateEnd(strm);
 		}
 	}
+
 
 	/// <summary>Use the index to read len bytes from offset into buf. </summary>
 	/// <param name="offset">starting from `offset` of uncompressed bytes</param>
