@@ -3,7 +3,7 @@ namespace ParallelParsing.ZRan.NET;
 
 public static class IndexIO
 {
-	// count : int | points : [(output : long) | (input : long) 
+	// chunksize : uint | count : int | points : [(output : long) | (input : long) 
 	// 						  | (bits : int) | (winLen : int) | (win : [byte])]
 	public static void Serialize(this Index index, string path)
 	{

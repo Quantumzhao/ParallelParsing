@@ -3,7 +3,7 @@ using static ParallelParsing.ZRan.NET.Constants;
 
 namespace ParallelParsing.ZRan.NET;
 
-public class Index
+public sealed class Index
 {
 	// allocated list of entries
 	public List<Point> List;
@@ -16,7 +16,7 @@ public class Index
 		ChunkSize = chunksize;
 	}
 
-	public void AddPoint(int bits, long input, long output, uint left, byte[] window)
+	public void AddPoint(int bits, long input, long output, byte[] window)
 	{
 		Point next = new Point(output, input, bits);
 
@@ -32,7 +32,7 @@ public class Index
 	}
 }
 
-public class Point
+public sealed class Point
 {
 	// corresponding offset in uncompressed data
 	public readonly long Output;

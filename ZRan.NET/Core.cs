@@ -16,11 +16,11 @@ public static class Core
 	/// span should be chosen to balance the speed of random access against the memory 
 	/// requirements of the list, about 32K bytes per access point. 
 	/// </param>
-	public static Index BuildDeflateIndex(FileStream file, long span, uint chunksize)
+	public static Index BuildDeflateIndex(FileStream file, uint chunksize)
 	{
 		// Find in which "NextIn"s the checkpoints are going to appear
 		List<int> pointAppearsInInputBuffer = new List<int>();
-		GetInputBufferIndexForSlowerRead(file, span, chunksize, pointAppearsInInputBuffer);
+		GetInputBufferIndexForSlowerRead(file, chunksize, pointAppearsInInputBuffer);
 		
 		// foreach (int idx in pointAppearsInInputBuffer)
 		// {
@@ -219,18 +219,18 @@ public static class Core
 								Array.Copy(prevWindow, usefulBytesInCurrentWindow, tempWindow, 0, bytesToCopyFromPrev);
 								Array.Copy(window, 0, tempWindow, bytesToCopyFromPrev, usefulBytesInCurrentWindow);
 
-								index.AddPoint(strm.DataType & 7, tempTotin, tempTotout, strm.AvailOut, tempWindow);
+								index.AddPoint(strm.DataType & 7, tempTotin, tempTotout, tempWindow);
 								recordCounter = 1;
 								// strm.NextOut.PrintASCII(1000);
-								// Console.WriteLine("Add point----------------------------------------");
+								Console.WriteLine("Add point----------------------------------------");
 								// Console.WriteLine("prevTotout: " + prevTotout);
 								// Console.WriteLine("length: " + tempLength);
-								// Console.WriteLine("totin:  " + tempTotin);
-								// Console.WriteLine("totout: " + tempTotout);
-								// strm.NextOut.PrintASCIIFromTo((((hasPoint && prevAvailOut != 0) || (inputBufferCounter != 0 && prevAvailOut != 0)) ? len-prevAvailOut : 0), tempLength);
-								
-								Console.WriteLine("--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
-								tempWindow.PrintASCII(32*1024);
+								Console.WriteLine("totin:  " + tempTotin);
+								Console.WriteLine("totout: " + tempTotout);
+								strm.NextOut.PrintASCIIFromTo((((hasPoint && prevAvailOut != 0) || (inputBufferCounter != 0 && prevAvailOut != 0)) ? len-prevAvailOut : 0), tempLength);
+								// tempWindow.PrintASCII(WINSIZE);
+								// Console.WriteLine("--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
+								// tempWindow.PrintASCII(32*1024);
 
 							}
 							// 
@@ -367,7 +367,7 @@ public static class Core
 		}
 	}
 
-	public static void GetInputBufferIndexForSlowerRead(FileStream file, long span, uint chunksize, List<int> pointAppearsInInputBuffer)
+	public static void GetInputBufferIndexForSlowerRead(FileStream file, uint chunksize, List<int> pointAppearsInInputBuffer)
 	{
 		ZStream strm = new();
 		Index index = new Index(chunksize);

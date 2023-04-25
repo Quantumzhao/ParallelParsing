@@ -8,13 +8,13 @@ using System.Text;
 
 var testFile = "../Gzipped_FASTQ_Files/SRR11192680.fastq.gz";
 using var fs = File.OpenRead(testFile);
-Core.BuildDeflateIndex(fs, Constants.SPAN, 200);
+Core.BuildDeflateIndex(fs, 200);
 // Core.BuildDeflateIndex(fs, Constants.SPAN, 200);
 
 // var fileName = "../Gzipped_FASTQ_Files/SRR11192680.fastq.gz";
 // // var fileName = "../Gzipped_FASTQ_Files/tests/gplv3.txt.gz";
 // using var file = File.OpenRead(fileName);
-// var index = Core.BuildDeflateIndex(file, Constants.SPAN, IndexIO.Deserialize(fileName).ChunkSize);
+// var index = Core.BuildDeflateIndex(file, IndexIO.Deserialize(fileName).ChunkSize);
 // // Console.WriteLine(len);
 
 // const int LEN = 16384;
