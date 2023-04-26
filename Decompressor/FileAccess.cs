@@ -7,99 +7,94 @@ using Index = ParallelParsing.ZRan.NET.Index;
 
 namespace ParallelParsing;
 
-public static class FileAccess
+public class LazyFileRead : IDisposable
 {
-
-}
-
-public abstract class LazyFileRead : IEnumerable<byte[]>, IDisposable
-{
-	public abstract void Dispose();
-	public abstract IEnumerator<byte[]> GetEnumerator();
-
-	IEnumerator IEnumerable.GetEnumerator() => this.GetEnumerator();
-}
-
-public sealed class LazyFileReadParallel : LazyFileRead
-{
-	public override void Dispose()
-	{
-		throw new NotImplementedException();
-	}
-
-	public override IEnumerator<byte[]> GetEnumerator()
+	public void Dispose()
 	{
 		throw new NotImplementedException();
 	}
 }
 
-public sealed class LazyFileReadSequential : LazyFileRead
-{
-	public override IEnumerator<byte[]> GetEnumerator() => _Enumerator;
-	private readonly FileReader _Enumerator;
+// public sealed class LazyFileReadParallel : LazyFileRead
+// {
+// 	public override void Dispose()
+// 	{
+// 		throw new NotImplementedException();
+// 	}
 
-	public LazyFileReadSequential(Index index, string path)
-	{
-		var file = File.OpenRead(path);
-		_Enumerator = new FileReader(index, file);
-	}
+// 	public override IEnumerator<byte[]> GetEnumerator()
+// 	{
+// 		throw new NotImplementedException();
+// 	}
+// }
 
-	public override void Dispose()
-	{
-		_Enumerator.Dispose();
-	}
+// public sealed class LazyFileReadSequential : LazyFileRead
+// {
+// 	public override IEnumerator<byte[]> GetEnumerator() => _Enumerator;
+// 	private readonly FileReader _Enumerator;
 
-	private sealed class FileReader : IEnumerator<byte[]>
-	{
-		private byte[]? _Buffer;
-		public byte[] Current
-		{
-			get
-			{
-				if (_Buffer == null) throw new InvalidOperationException();
-				else return _Buffer;
-			}
-		}
+// 	public LazyFileReadSequential(Index index, string path)
+// 	{
+// 		var file = File.OpenRead(path);
+// 		_Enumerator = new FileReader(index, file);
+// 	}
 
-		object IEnumerator.Current => this.Current;
+// 	public override void Dispose()
+// 	{
+// 		_Enumerator.Dispose();
+// 	}
 
-		public FileReader(Index index, FileStream file)
-		{
-			_Index = index;
-			_File = file; 
-			_BinReader = new BinaryReader(file);
-			_ListEnumerator = index.List.GetEnumerator();
-			_CurrPoint = new Point(0, 0, 0);
-		}
+// 	private sealed class FileReader : IEnumerator<byte[]>
+// 	{
+// 		private byte[]? _Buffer;
+// 		public byte[] Current
+// 		{
+// 			get
+// 			{
+// 				if (_Buffer == null) throw new InvalidOperationException();
+// 				else return _Buffer;
+// 			}
+// 		}
 
-		private readonly Index _Index;
-		private readonly FileStream _File;
-		private readonly BinaryReader _BinReader;
-		private readonly IEnumerator<Point> _ListEnumerator;
-		private readonly Point _CurrPoint;
+// 		object IEnumerator.Current => this.Current;
 
-		public void Dispose()
-		{
-			_BinReader.Dispose();
-			_File.Dispose();
-			_ListEnumerator.Dispose();
-		}
+// 		public FileReader(Index index, FileStream file)
+// 		{
+// 			_Index = index;
+// 			_File = file; 
+// 			_BinReader = new BinaryReader(file);
+// 			_ListEnumerator = index.List.GetEnumerator();
+// 			_CurrPoint = new Point(0, 0, 0);
+// 		}
 
-		public bool MoveNext()
-		{
-			var from = (int)(_ListEnumerator.Current?.Input ?? 0);
+// 		private readonly Index _Index;
+// 		private readonly FileStream _File;
+// 		private readonly BinaryReader _BinReader;
+// 		private readonly IEnumerator<Point> _ListEnumerator;
+// 		private readonly Point _CurrPoint;
+
+// 		public void Dispose()
+// 		{
+// 			_BinReader.Dispose();
+// 			_File.Dispose();
+// 			_ListEnumerator.Dispose();
+// 		}
+
+// 		public bool MoveNext()
+// 		{
+// 			var from = (int)(_ListEnumerator.Current?.Input ?? 0);
 			
-			var ret = _ListEnumerator.MoveNext();
-			if (!ret) return false;
-			var to = (int)(_ListEnumerator.Current?.Input ?? _File.Length);
+// 			var ret = _ListEnumerator.MoveNext();
+// 			if (!ret) return false;
+// 			var to = (int)(_ListEnumerator.Current?.Input ?? _File.Length);
 
-			// ? might be problematic once file size > 2GB
-			var len = to - from;
-			_Buffer = new byte[len];
-			_File.ReadExactly(_Buffer, from, len);
-			return true;
-		}
+// 			// ? might be problematic once file size > 2GB
+// 			var len = to - from;
+// 			_Buffer = new byte[len];
+// 			_File.ReadExactly(_Buffer, from, len);
+// 			return true;
+// 		}
 
-		void IEnumerator.Reset() => new NotSupportedException();
-	}
-}
+// 		void IEnumerator.Reset() => new NotSupportedException();
+// 	}
+// }

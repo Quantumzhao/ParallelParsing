@@ -29,10 +29,10 @@ class BatchedFASTQ : IEnumerable<FASTQRecord>, IDisposable
 	{
 		public Enumerator(Index index, string gzipPath, bool enableSsdOptimization)
 		{
-			_Index = index;
-			_Reader = enableSsdOptimization ?
-					new LazyFileReadParallel() :
-					new LazyFileReadSequential(_Index, gzipPath);
+			// _Index = index;
+			// _Reader = enableSsdOptimization ?
+			// 		new LazyFileReadParallel() :
+			// 		new LazyFileReadSequential(_Index, gzipPath);
 		}
 		private LazyFileRead _Reader;
 		private Index _Index;
@@ -48,22 +48,22 @@ class BatchedFASTQ : IEnumerable<FASTQRecord>, IDisposable
 
 		public bool MoveNext()
 		{
-			if (_Cache?.Count == 0)
-			{
-				var e = _Reader.GetEnumerator();
-				var ret = e.MoveNext();
-				if (!ret) return false;
+			// if (_Cache?.Count == 0)
+			// {
+			// 	var e = _Reader.GetEnumerator();
+			// 	var ret = e.MoveNext();
+			// 	if (!ret) return false;
 
-				var buf = new byte[Constants.WINSIZE];
-				var currPoint = _Index.List.GetEnumerator().Current;
-				Core.ExtractDeflateRange(e.Current, ,buf, );
-				var queue = new Queue<char>(Encoding.ASCII.GetChars(buf, 0, buf.Length));
-				_Cache = FASTQRecord.Parse(queue);
-			}
-			else
-			{
+			// 	var buf = new byte[Constants.WINSIZE];
+			// 	var currPoint = _Index.List.GetEnumerator().Current;
+			// 	Core.ExtractDeflateRange(e.Current, ,buf, );
+			// 	var queue = new Queue<char>(Encoding.ASCII.GetChars(buf, 0, buf.Length));
+			// 	_Cache = FASTQRecord.Parse(queue);
+			// }
+			// else
+			// {
 
-			}
+			// }
 
 			return true;
 		}

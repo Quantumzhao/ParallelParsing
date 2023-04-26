@@ -4,6 +4,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Text;
 using System.Linq;
+using System.Buffers;
 
 // test file downloaded from
 // https://trace.ncbi.nlm.nih.gov/Traces/?view=run_browser&acc=SRR11192680
@@ -16,66 +17,36 @@ public class Program
     public static int readByteSize = 64;
     static void Main(string[] args)
     {
-        var gzipPath = "something";
-        var indexPath = "somethingelse";
-        using var records = new BatchedFASTQ(indexPath, gzipPath, enableSsdOptimization: false);
-        records.Aggregate(0, (a, x) => a + x.Sequence.Count(c => c == 'A'));
-        // byte[] buffer = File.ReadAllBytes("Gzipped_FASTQ_Files/SRR11192680.fastq.gz");
+        // var gzipPath = "something";
+        // var indexPath = "somethingelse";
+        // using var records = new BatchedFASTQ(indexPath, gzipPath, enableSsdOptimization: false);
+        // records.Aggregate(0, (a, x) => a + x.Sequence.Count(c => c == 'A'));
 
-        // byte[] buffer = FileToByteArray("Gzipped_FASTQ_Files/SRR11192680.fastq.gz");
-        // byte[] buffer = FileToByteArray("../Gzipped_FASTQ_Files/SRR11192680.fastq.gz");
-        // byte[] buffer = FileToByteArray("Gzipped_FASTQ_Files/examplefile.gz");
+        var path = "../../Assignment1/Examples/benchmark9";
+        var createStream = () => File.Open("../../Assignment1/Examples/benchmark9", FileMode.Open, 
+            FileAccess.Read, FileShare.Read);
+        var disposeStream = (FileStream s) => s.Dispose();
+        var streams = new FileStream[2];
+        streams[0] = createStream();
+        streams[1] = createStream();
 
-        // string outputString = BitConverter.ToString(buffer);
-        // Console.WriteLine("byte 0x:   " + outputString);
-
-        // byte[] bytes_0_to_9 = new byte[10];
-        // byte[] bytes_10_to_19 = new byte[10];
-        // Array.Copy(buffer, 0, bytes_0_to_9, 0, 10);
-        // Array.Copy(buffer, 10, bytes_10_to_19, 0, 10);
-        // Console.WriteLine("bytes[0 :: 9] " + BitConverter.ToString(bytes_0_to_9));
-        // Console.WriteLine("bytes[10::19] " + BitConverter.ToString(bytes_10_to_19));
-
-        // // Assume no flags in the header for now
-        // var bits = new BitArray(new byte[] {buffer[10]});
-        // string firstByteOfFirstBlock = BitArrayToString(bits);
-        // Console.WriteLine("10th Byte: "+ BitConverter.ToString(new byte[] {buffer[10]}) + " " + firstByteOfFirstBlock);
-        // Console.WriteLine("isLastBlock: "+ (firstByteOfFirstBlock[0] == '0' ? "No" : "Yes"));
-        // string blockType = firstByteOfFirstBlock[1] == '0' ? 
-        //         (firstByteOfFirstBlock[2] == '0' ? "type 0 (no compression)" : "type 2 (compressed with dynamic Huffman codes)") :
-        //         (firstByteOfFirstBlock[2] == '0' ? "type 1 (compressed with fixed Huffman codes)" : "error");
-        // Console.WriteLine("blockType: " + blockType);
-        // 00 -> type 0 (no compression)
-        // 01 -> 10 -> type 2 (compressed with dynamic Huffman codes)
-        // 10 -> 01 -> type 1 (compressed with fixed Huffman codes)
+        var halfLength = (int)streams[0].Length / 2;
+        Console.WriteLine(halfLength);
+        streams[1].Position = halfLength;
+        var buffer = ArrayPool<byte>.Create(halfLength, 2);
+        var ss = new string[2];
+        Parallel.For(0, 2, i => {
+            var b = buffer.Rent(halfLength);
+            Console.WriteLine(b.Length);
+            streams[i].ReadExactly(b, 0, halfLength);
+            ss[i] = Encoding.ASCII.GetString(b);
+            Console.WriteLine(ss[i].Substring(0, 100));
+            Console.WriteLine(ss[i].Length);
+            buffer.Return(b);
+        });
         
-    }
-
-    // Alternative way to read Byte, should be be better at reading large file than File.ReadAllBytes()
-    public static byte[] FileToByteArray(string fileName)
-    {
-        byte[] fileData;
-
-        using (FileStream fs = File.OpenRead(fileName)) 
-        {
-            using (BinaryReader binaryReader = new BinaryReader(fs))
-            {
-                // fileData = binaryReader.ReadBytes((int)fs.Length); 
-                fileData = binaryReader.ReadBytes(readByteSize); 
-            }
-        }
-        return fileData;
-    }
-
-    public static string BitArrayToString(BitArray bits)
-    {
-        var stringBuilder = new StringBuilder();
-        for (int i = 0; i < bits.Count; i++) 
-        {
-            char c = bits[i] ? '1' : '0';
-            stringBuilder.Append(c);
-        }
-        return stringBuilder.ToString();
+        streams[0].Dispose();
+        streams[1].Dispose();
     }
 }
 
