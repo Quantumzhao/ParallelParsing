@@ -2,6 +2,8 @@
 using static ParallelParsing.ZRan.NET.Constants;
 using static ParallelParsing.ZRan.NET.Compat;
 using System.IO.Compression;
+using System.Text;
+using System.Runtime.InteropServices;
 
 namespace ParallelParsing.ZRan.NET;
 
@@ -684,7 +686,7 @@ public static class Core
 	// the chunk size parameter can be at most as large as 1 million
 	// otherwise it'll surpass the 2GB object limit
 	// input buffer begins with the remaining bits with a size indicated by start.Bits
-	public static int ExtractDeflateRange(
+	public static unsafe int ExtractDeflateRange(
 		byte[] fileBuffer, Point start, byte[] buf, int len)
 	{
 		ZStream strm = new();
@@ -707,16 +709,16 @@ public static class Core
 				throw new ZException(ret);
 			
 			// file.Seek(start.Input - (start.Bits != 0 ? 1 : 0), SeekOrigin.Begin);
-			if (start.Bits != 0)
-			{
-				// ret = (ZResult)file.ReadByte();
-				// if (ret == ZResult.ERRNO)
-				// {
-				// 	throw new ZException(ZResult.DATA_ERROR);
-				// }
-				InflatePrime(strm, start.Bits, fileBuffer[0] >> (8 - start.Bits));
-				fileBufferOffset++;
-			}
+			// if (start.Bits != 0)
+			// {
+			// 	// ret = (ZResult)file.ReadByte();
+			// 	// if (ret == ZResult.ERRNO)
+			// 	// {
+			// 	// 	throw new ZException(ZResult.DATA_ERROR);
+			// 	// }
+			// 	InflatePrime(strm, start.Bits, fileBuffer[0] >> (8 - start.Bits));
+			// 	fileBufferOffset++;
+			// }
 			InflateSetDictionary(strm, start.Window, WINSIZE);
 
 			strm.AvailIn = 0;
@@ -739,6 +741,7 @@ public static class Core
 					strm.NextIn = input;
 				}
 				ret = Inflate(strm, ZFlush.NO_FLUSH);
+				var s = Marshal.PtrToStringAnsi(strm.Value.msg);
 				// normal inflate
 				if (ret == ZResult.MEM_ERROR || ret == ZResult.DATA_ERROR || ret == ZResult.NEED_DICT)
 					throw new ZException(ret);

@@ -68,7 +68,7 @@ internal unsafe struct z_stream
 
 #region UNUSED
 	[MarshalAs(UnmanagedType.LPStr)]
-	public char* msg;
+	public IntPtr msg;
 	public void* state;
 	public delegate* unmanaged[Cdecl]<void*, uint, uint, void*> zalloc;
 	public delegate* unmanaged[Cdecl]<void*, void*, void> zfree;
