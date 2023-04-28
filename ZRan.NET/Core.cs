@@ -22,10 +22,10 @@ public static class Core
 		List<int> pointAppearsInInputBuffer = new List<int>();
 		GetInputBufferIndexForSlowerRead(file, chunksize, pointAppearsInInputBuffer);
 		
-		// foreach (int idx in pointAppearsInInputBuffer)
-		// {
-		// 	Console.WriteLine(idx);
-		// }
+		foreach (int idx in pointAppearsInInputBuffer)
+		{
+			Console.WriteLine(idx);
+		}
 
 		// Reset file stream position for a new round of reading
 		file.Position = 0;
@@ -136,18 +136,8 @@ public static class Core
 					// * data_type is set as noted here every time inflate() returns 
 					// * for all flush options, and so can be used to determine the amount of 
 					// * currently consumed input in bits. 
-					// // return at end of block
-					// strm.NextOut.Print((int)strm.AvailOut);
-					// strm.NextIn.Print((int)strm.AvailIn);
-					// Console.WriteLine("after inflate:");				
+					// return at end of block
 					ret = Inflate(strm, ZFlush.BLOCK);
-					// Console.WriteLine("---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
-					// strm.NextOut.PrintASCII(128);
-					// strm.NextOut.PrintASCII((int)(strm.NextOut.Length - strm.AvailOut));
-					// strm.NextOut.PrintASCIIFirstAndLast(256);
-					// strm.NextIn.Print((int)strm.AvailIn);
-
-		
 
 					totin -= strm.AvailIn;
 					totout -= strm.AvailOut;
@@ -169,15 +159,9 @@ public static class Core
 					}
 
 
-					//-----------------------------------------------------------------------------------------------------------------
-					// int tempOutByteCounter = 0; // for the ending buffer
-					// int tempRecordCounter = 0; // for the ending buffer
+					//-----------------------------------------------------------------
 					var len = strm.NextOut.Length;
-					
-					
 					int bytesBeforeTargetAt = 0;
-
-					
 
 					for (int i = ((hasPoint && prevAvailOut != 0) || (inputBufferCounter != 0 && prevAvailOut != 0)) ? len-prevAvailOut : 0; 
 						i < len-strm.AvailOut; i++)
@@ -228,12 +212,7 @@ public static class Core
 								Console.WriteLine("totin:  " + tempTotin);
 								Console.WriteLine("totout: " + tempTotout);
 								strm.NextOut.PrintASCIIFromTo((((hasPoint && prevAvailOut != 0) || (inputBufferCounter != 0 && prevAvailOut != 0)) ? len-prevAvailOut : 0), tempLength);
-								// tempWindow.PrintASCII(WINSIZE);
-								// Console.WriteLine("--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
-								// tempWindow.PrintASCII(32*1024);
-
 							}
-							// 
 						}
 						
 					}
@@ -250,71 +229,6 @@ public static class Core
 						prevAvailOut = 0;
 					}
 					
-					// for (int i = 0; i < len; i++)
-					// {
-					// 	var c = strm.NextOut[i];
-					// 	// '@' = 64
-					// 	if (c == 64)
-					// 	{
-					// 		tempRecordCounter++;
-					// 		if (recordCounter < index.ChunkSize)
-					// 			recordCounter++;
-					// 	}
-
-					// 	if (tempRecordCounter <= index.ChunkSize)
-					// 	{
-					// 		tempOutByteCounter++;
-					// 	}
-					// }
-
-					// if (recordCounter == index.ChunkSize) {
-					// 	if (strm.AvailOut > 0)
-					// 	{
-
-					// 	}
-					// 	else 
-					// 	{
-
-					// 	}
-					// 	strm.NextOut.PrintASCII(10240);
-					// 	outByteCounter += tempOutByteCounter;
-					// 	prevTotout = totout;
-						
-					// 	recordCounter = prevRecordCounter + tempRecordCounter - recordCounter;
-					// 	index.AddPoint(strm.DataType & 7, totin, totout, strm.AvailOut, window);
-					// }
-					// else {
-					// 	// outByteCounter += (len - (int)strm.AvailOut); // plan B: manually count bytes 
-					// 	outByteCounter = totout - prevTotout;
-
-					// 	// Edge case: when decompressing the last part of NextIn, it is possible that the output (i.e., uncompressed data) 
-					// 	// from that part is not able to fill the entire 32K in NextOut. In this case, the first NextOut from the next NextIn 
-					// 	// will be the same as the current NextOut. Thus, we need to pay attention not to recount recordCounter and totout.
-					// 	if (strm.AvailOut > 0) 
-					// 	{
-							
-					// 		recordCounter = prevRecordCounter;
-						
-					// 	}
-
-					// }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-					// prevRecordCounter = recordCounter;
 
 					// if at end of block, consider adding an index entry (note that if
 					// data_type indicates an end-of-block, then all of the
@@ -330,12 +244,6 @@ public static class Core
 					// * +128 if inflate() returned immediately after decoding an end-of-block code
 					// *      or decoding the complete header up to just before the first byte 
 					// *      of the deflate stream
-					// if ((strm.DataType & 128) != 0 && (strm.DataType & 64) == 0 &&
-					// 	(totout == 0 || totout - last > span))
-					// {
-					// 	index.AddPoint(strm.DataType & 7, totin, totout, strm.AvailOut, window);
-					// 	last = totout;
-					// }
 				} while (strm.AvailIn != 0);
 			
 				if (hasPoint)
@@ -426,11 +334,8 @@ public static class Core
 					totin += strm.AvailIn;
 					totout += strm.AvailOut;
 					
-					// return at end of block	
-					//--------------------------------------------------------		
+					// return at end of block		
 					ret = Inflate(strm, ZFlush.BLOCK);
-					//--------------------------------------------------------	
-					// strm.NextOut.Print(2048);
 
 					totin -= strm.AvailIn;
 					totout -= strm.AvailOut;
@@ -451,8 +356,6 @@ public static class Core
 						break;
 					}
 
-					int tempOutByteCounter = 0; // for the ending buffer
-					int tempRecordCounter = 0; // for the ending buffer
 					var len = strm.NextOut.Length;
 					
 					for (int i = (inputBufferCounter != 1 && prevAvailOut != 0) ? len-prevAvailOut : 0; i < len-strm.AvailOut; i++)
@@ -470,7 +373,6 @@ public static class Core
 						}
 					}
 					
-					
 					if (strm.AvailOut > 0)
 					{
 						prevAvailOut = (int)strm.AvailOut;
@@ -479,31 +381,14 @@ public static class Core
 					{
 						prevAvailOut = 0;
 					}
-					// if (recordCounter > index.ChunkSize) {
-					// 	pointAppearsInInputBuffer.Add(inputBufferCounter);
-					// 	recordCounter = 0;
-					// }
-					// else {
-					// 	if (strm.AvailOut > 0) 
-					// 	{
-					// 		// if not the last one
-					// 		recordCounter = prevRecordCounter;
-					// 	}
-					// }
 
-					prevRecordCounter = recordCounter;
-				
-				
-				
+					prevRecordCounter = recordCounter;			
 				} while (strm.AvailIn != 0);
 			} while (ret != ZResult.STREAM_END);
-
-			// index.length = totout;
-			
 		}
 		finally
 		{
-			// clean up and return index (release unused entries in list)
+			// clean up 
 			InflateEnd(strm);
 		}
 	}
