@@ -1,5 +1,7 @@
 
+using System.Buffers;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Text;
 using ParallelParsing.ZRan.NET;
@@ -9,6 +11,7 @@ namespace ParallelParsing;
 
 class BatchedFASTQ : IEnumerable<FASTQRecord>, IDisposable
 {
+
 	public BatchedFASTQ(string indexPath, string gzipPath, bool enableSsdOptimization)
 	{
 		var index = IndexIO.Deserialize(indexPath);
@@ -33,12 +36,21 @@ class BatchedFASTQ : IEnumerable<FASTQRecord>, IDisposable
 			// _Reader = enableSsdOptimization ?
 			// 		new LazyFileReadParallel() :
 			// 		new LazyFileReadSequential(_Index, gzipPath);
+			BufferPool = ArrayPool<byte>.Create(int.MaxValue, 1024);
 		}
-		private LazyFileRead _Reader;
+		// ~ 500 MB to 1 GB
+		public const int RECORD_CACHE_MAX_LENGTH = 1000000;
+		// = 1 GB
+		public const int READ_BUFFER_SIZE_MAX_BYTES = 1 << 30;
+		public ArrayPool<byte> BufferPool;
+		public ConcurrentQueue<(Point, int, byte[])> ReadBuffers => _Reader.OutputQueue;
+		private int _CumulativeBufferSize;
+		public ConcurrentQueue<FASTQRecord> Cache;
+		private LazyFileReader _Reader;
 		private Index _Index;
-		private IReadOnlyList<FASTQRecord>? _Cache = null;
 		private int _CacheIndex = -1;
-		public FASTQRecord Current => throw new NotImplementedException();
+		private FASTQRecord _Current;
+		public FASTQRecord Current => _Current;
 		object IEnumerator.Current => this.Current;
 
 		public void Dispose()
@@ -48,22 +60,18 @@ class BatchedFASTQ : IEnumerable<FASTQRecord>, IDisposable
 
 		public bool MoveNext()
 		{
-			// if (_Cache?.Count == 0)
-			// {
-			// 	var e = _Reader.GetEnumerator();
-			// 	var ret = e.MoveNext();
-			// 	if (!ret) return false;
+			if (_CumulativeBufferSize <= READ_BUFFER_SIZE_MAX_BYTES) 
+				_Reader.TryReadMore(READ_BUFFER_SIZE_MAX_BYTES);
+			
+			if (Cache.Count < RECORD_CACHE_LENGTH) Decompressor.Try
 
-			// 	var buf = new byte[Constants.WINSIZE];
-			// 	var currPoint = _Index.List.GetEnumerator().Current;
-			// 	Core.ExtractDeflateRange(e.Current, ,buf, );
-			// 	var queue = new Queue<char>(Encoding.ASCII.GetChars(buf, 0, buf.Length));
-			// 	_Cache = FASTQRecord.Parse(queue);
-			// }
-			// else
-			// {
+			if (Cache.TryDequeue(out var res))
+			{
+				_Current = res;
+				return true;
+			}
 
-			// }
+
 
 			return true;
 		}

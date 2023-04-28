@@ -4,29 +4,36 @@ using System.Collections.Generic;
 using System.Collections;
 using ParallelParsing.ZRan.NET;
 using Index = ParallelParsing.ZRan.NET.Index;
+using System.Collections.Concurrent;
+using System.Buffers;
 
 namespace ParallelParsing;
 
-public class LazyFileRead : IDisposable
+public class LazyFileReader : IDisposable
 {
+	public readonly ConcurrentQueue<(Point, int, byte[])> OutputQueue;
+	private Index _Index;
+	private FileStream _File;
+	private ArrayPool<byte> _BufferPool;
+
+	public LazyFileReader(Index index, string path, ArrayPool<byte> pool)
+	{
+		_Index = index;
+		OutputQueue = new();
+		_BufferPool = pool;
+	}
+
 	public void Dispose()
 	{
-		throw new NotImplementedException();
+		_File.Dispose();
+	}
+
+	public async int TryReadMore(int size, out byte[] rentBuffer)
+	{
+		
+		return await _File.ReadAsync();
 	}
 }
-
-// public sealed class LazyFileReadParallel : LazyFileRead
-// {
-// 	public override void Dispose()
-// 	{
-// 		throw new NotImplementedException();
-// 	}
-
-// 	public override IEnumerator<byte[]> GetEnumerator()
-// 	{
-// 		throw new NotImplementedException();
-// 	}
-// }
 
 // public sealed class LazyFileReadSequential : LazyFileRead
 // {

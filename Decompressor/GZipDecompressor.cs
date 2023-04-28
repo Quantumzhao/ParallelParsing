@@ -1,6 +1,7 @@
 
 using System.Text;
 using ParallelParsing.ZRan.NET;
+using System.Threading;
 
 namespace ParallelParsing;
 
@@ -20,7 +21,6 @@ public sealed class Decompressor
 		// 	var parsed = FASTQRecord.Parse(new Queue<char>(Encoding.ASCII.GetChars(outputBytes)));
 		// 	allRecords.AddRange(parsed);
 		// });
-
 		return allRecords;
 	}
 
