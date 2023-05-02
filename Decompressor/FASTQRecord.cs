@@ -3,7 +3,7 @@ using System.Text;
 
 namespace ParallelParsing;
 
-public sealed class FASTQRecord
+public struct FASTQRecord
 {
 	public FASTQRecord(string id, char[] seq, string other, char[] q)
 	{
