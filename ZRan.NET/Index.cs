@@ -19,13 +19,19 @@ public sealed class Index
 
 	public void AddPoint(int bits, long input, long output, byte[] window)
 	{
-		Point next = new Point(output, input, bits);
+		if (this.List.Count == 0)
+		{
+			this.ChunkMaxBytes = (int)output;
+		}
+		else 
+		{
+			int outputSize = (int)output - (int)this.List[this.List.Count - 1].Output;
 
-		// if (left != 0)
-		// 	Array.Copy(window, WINSIZE - left, next.Window, 0, left);
-			
-		// if (left < WINSIZE)
-		// 	Array.Copy(window, 0, next.Window, left, WINSIZE - left);
+			if (outputSize > this.ChunkMaxBytes)
+				this.ChunkMaxBytes = outputSize;
+		}
+		
+		Point next = new Point(output, input, bits);
 
 		Array.Copy(window, next.Window, WINSIZE);
 		
