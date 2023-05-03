@@ -1,5 +1,7 @@
 
+using System.Buffers;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Text;
 using ParallelParsing.ZRan.NET;
@@ -9,6 +11,7 @@ namespace ParallelParsing;
 
 class BatchedFASTQ : IEnumerable<FASTQRecord>, IDisposable
 {
+
 	public BatchedFASTQ(string indexPath, string gzipPath, bool enableSsdOptimization)
 	{
 		var index = IndexIO.Deserialize(indexPath);
@@ -29,16 +32,21 @@ class BatchedFASTQ : IEnumerable<FASTQRecord>, IDisposable
 	{
 		public Enumerator(Index index, string gzipPath, bool enableSsdOptimization)
 		{
+			BufferPool = ArrayPool<byte>.Create(index.ChunkMaxBytes, 1024);
+			_Reader = new LazyFileReader(index, gzipPath, BufferPool, enableSsdOptimization);
+			RecordCache = new();
 			_Index = index;
-			_Reader = enableSsdOptimization ?
-					new LazyFileReadParallel() :
-					new LazyFileReadSequential(_Index, gzipPath);
+			_Reader = new(index, gzipPath, BufferPool, enableSsdOptimization);
+			_Current = default; 
 		}
-		private LazyFileRead _Reader;
+		// ~ 500 MB to 1 GB
+		public const int RECORD_CACHE_MAX_LENGTH = 1000000;
+		public ArrayPool<byte> BufferPool;
+		public ConcurrentQueue<FASTQRecord> RecordCache;
+		private LazyFileReader _Reader;
 		private Index _Index;
-		private IReadOnlyList<FASTQRecord>? _Cache = null;
-		private int _CacheIndex = -1;
-		public FASTQRecord Current => throw new NotImplementedException();
+		private FASTQRecord _Current;
+		public FASTQRecord Current => _Current;
 		object IEnumerator.Current => this.Current;
 
 		public void Dispose()
@@ -48,24 +56,27 @@ class BatchedFASTQ : IEnumerable<FASTQRecord>, IDisposable
 
 		public bool MoveNext()
 		{
-			if (_Cache?.Count == 0)
+			if (RecordCache.Count <= RECORD_CACHE_MAX_LENGTH)
 			{
-				var e = _Reader.GetEnumerator();
-				var ret = e.MoveNext();
-				if (!ret) return false;
-
-				var buf = new byte[Constants.WINSIZE];
-				var currPoint = _Index.List.GetEnumerator().Current;
-				Core.ExtractDeflateRange(e.Current, ,buf, );
-				var queue = new Queue<char>(Encoding.ASCII.GetChars(buf, 0, buf.Length));
-				_Cache = FASTQRecord.Parse(queue);
-			}
-			else
-			{
-
+				if (_Reader.TryGetNewPartition(out var entry))
+				{
+					// TODO: Make it parallel
+					(var from, var to, var inBuf) = entry;
+					var buf = BufferPool.Rent(_Index.ChunkMaxBytes);
+					Core.ExtractDeflateRange2(inBuf, from, to, buf);
+					var rs = FASTQRecord.Parse(new Queue<char>(buf.Select(b => (char)b)));
+					BufferPool.Return(buf);
+					BufferPool.Return(inBuf);
+					Parallel.ForEach(rs, (r, _) => RecordCache.Enqueue(r));
+				}
 			}
 
-			return true;
+			if (RecordCache.TryDequeue(out var res))
+			{
+				_Current = res;
+				return true;
+			}
+			else return false;
 		}
 
 		void IEnumerator.Reset() => throw new NotSupportedException();

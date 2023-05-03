@@ -5,9 +5,26 @@ using ParallelParsing.ZRan.NET;
 using Index = ParallelParsing.ZRan.NET.Index;
 using System.IO.Compression;
 
+
+//Bug: when there are more than 93 points in index, it will stop running
+
+
 var testFile = "../Gzipped_FASTQ_Files/SRR11192680.fastq.gz";
-using var fs = File.OpenRead(testFile);
-Core.BuildDeflateIndex(fs, 200);
+// var testFile = "../Gzipped_FASTQ_Files/SRR11192680_original.fastq.gz";
+var fs = File.OpenRead(testFile);
+var i = Core.BuildDeflateIndex(fs, 200);
+fs.Dispose();
+// i.Serialize("../Gzipped_FASTQ_Files/test1.fastq.gzi");
+
+fs = File.OpenRead(testFile);
+var len_in = i.List[0].Input + 1;
+var fileBuffer = new byte[len_in];
+var outBuf = new byte[Constants.WINSIZE];
+fs.ReadExactly(fileBuffer, 0, (int)len_in);
+Core.ExtractDeflateIndex(fs, i, 0, outBuf, (int)len_in);
+// Core.ExtractDeflateIndex(fs, i, (int)i.List[1].Output, outBuf, 500);
+outBuf.PrintASCII((int)Constants.WINSIZE);
+
 // Core.BuildDeflateIndex(fs, Constants.SPAN, 200);
 
 // var fileName = "../Gzipped_FASTQ_Files/SRR11192680.fastq.gz";
