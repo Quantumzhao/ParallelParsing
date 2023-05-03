@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../ZRan.NET/ZRan.NET.csproj" />
+    <ProjectReference Include="../Benchmark/Benchmark.csproj">
   </ItemGroup>
 
   <PropertyGroup>
