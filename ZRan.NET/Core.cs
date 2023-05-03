@@ -22,6 +22,7 @@ public static class Core
 	{
 		//DELETE THIS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		int temp = 0;
+		int temp2 = 0;
 
 
 
@@ -139,7 +140,8 @@ public static class Core
 					// * currently consumed input in bits. 
 					// return at end of block
 					ret = Inflate(strm, ZFlush.BLOCK);
-						
+								if (chunksize == 1400 && temp == 47) Console.WriteLine(++temp2);
+
 					totin -= strm.AvailIn;
 					totout -= strm.AvailOut;
 
@@ -213,7 +215,7 @@ public static class Core
 								// Console.WriteLine("totin:  " + tempTotin);
 								// Console.WriteLine("totout: " + tempTotout);
 								// strm.NextOut.PrintASCIIFromTo((((hasPoint && prevAvailOut != 0) || (inputBufferCounter != 0 && prevAvailOut != 0)) ? len-prevAvailOut : 0), tempLength);
-								// Console.WriteLine(++temp);
+								Console.WriteLine(++temp);
 							}
 						}
 
