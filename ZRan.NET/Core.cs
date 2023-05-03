@@ -20,30 +20,29 @@ public static class Core
 	/// </param>
 	public static Index BuildDeflateIndex(FileStream file, uint chunksize)
 	{
-		// Find in which "NextIn"s the checkpoints are going to appear
-		List<int> pointAppearsInInputBuffer = new List<int>();
-		GetInputBufferIndexForSlowerRead(file, chunksize, pointAppearsInInputBuffer);
+		//DELETE THIS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		int temp = 0;
 
-		foreach (int idx in pointAppearsInInputBuffer)
-		{
-			Console.WriteLine(idx);
-		}
 
-		// Reset file stream position for a new round of reading
-		file.Position = 0;
+
+
 
 
 		ZStream strm = new();
 		Index index = new Index(chunksize);
 		byte[] input = new byte[CHUNK];
 		byte[] window = new byte[WINSIZE];
+		
+		// Find in which "NextIn"s the checkpoints are going to appear
+		List<int> pointAppearsInInputBuffer = new List<int>();
+		GetInputBufferIndexForSlowerRead(file, chunksize, pointAppearsInInputBuffer, index);
+		// foreach (int idx in pointAppearsInInputBuffer) Console.WriteLine(idx);
+
+		// Reset file stream position for a new round of reading
+		file.Position = 0;
 
 		// window from the previous iteration
 		byte[] prevWindow = new byte[WINSIZE];
-
-		// int prevRecordCounter = 0;
-		// long inByteCounter = 0;
-		// long outByteCounter = 0;
 
 		// Count records so we know where/when to add a point
 		int recordCounter = 0;
@@ -140,7 +139,7 @@ public static class Core
 					// * currently consumed input in bits. 
 					// return at end of block
 					ret = Inflate(strm, ZFlush.BLOCK);
-
+						
 					totin -= strm.AvailIn;
 					totout -= strm.AvailOut;
 
@@ -208,12 +207,13 @@ public static class Core
 								index.AddPoint(strm.DataType & 7, tempTotin, tempTotout, tempWindow);
 								recordCounter = 1;
 								// strm.NextOut.PrintASCII(1000);
-								Console.WriteLine("Add point----------------------------------------");
+								// Console.WriteLine("Add point----------------------------------------");
 								// Console.WriteLine("prevTotout: " + prevTotout);
 								// Console.WriteLine("length: " + tempLength);
-								Console.WriteLine("totin:  " + tempTotin);
-								Console.WriteLine("totout: " + tempTotout);
-								strm.NextOut.PrintASCIIFromTo((((hasPoint && prevAvailOut != 0) || (inputBufferCounter != 0 && prevAvailOut != 0)) ? len - prevAvailOut : 0), tempLength);
+								// Console.WriteLine("totin:  " + tempTotin);
+								// Console.WriteLine("totout: " + tempTotout);
+								// strm.NextOut.PrintASCIIFromTo((((hasPoint && prevAvailOut != 0) || (inputBufferCounter != 0 && prevAvailOut != 0)) ? len-prevAvailOut : 0), tempLength);
+								// Console.WriteLine(++temp);
 							}
 						}
 
@@ -277,10 +277,9 @@ public static class Core
 		}
 	}
 
-	public static void GetInputBufferIndexForSlowerRead(FileStream file, uint chunksize, List<int> pointAppearsInInputBuffer)
+	public static void GetInputBufferIndexForSlowerRead(FileStream file, uint chunksize, List<int> pointAppearsInInputBuffer, Index index)
 	{
 		ZStream strm = new();
-		Index index = new Index(chunksize);
 		byte[] input = new byte[CHUNK];
 		byte[] window = new byte[WINSIZE];
 		int recordCounter = 0;
@@ -338,6 +337,8 @@ public static class Core
 
 					// return at end of block		
 					ret = Inflate(strm, ZFlush.BLOCK);
+					if (strm.DataType == 128 && index.List.Count == 0)
+						index.AddPoint(strm.DataType & 7, totin - strm.AvailIn, 0, window);
 
 					totin -= strm.AvailIn;
 					totout -= strm.AvailOut;
