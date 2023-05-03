@@ -6,102 +6,88 @@ using ParallelParsing.ZRan.NET;
 using Index = ParallelParsing.ZRan.NET.Index;
 using System.Collections.Concurrent;
 using System.Buffers;
+using System.Diagnostics;
 
 namespace ParallelParsing;
 
 public class LazyFileReader : IDisposable
 {
-	public readonly ConcurrentQueue<(Point, int, byte[])> OutputQueue;
-	private Index _Index;
-	private FileStream _File;
-	private ArrayPool<byte> _BufferPool;
+	public const int FILE_THREADS_COUNT_SSD = 2;
+	public const int FILE_THREADS_COUNT_HDD = 1;
+	
+	public const int READ_BUFFER_SIZE_MAX_BYTES = 1 << 30; // 1 GB
 
-	public LazyFileReader(Index index, string path, ArrayPool<byte> pool)
+	public readonly ConcurrentQueue<(Point from, Point to, byte[] segment)> PartitionQueue;
+	private Index _Index;
+	private IEnumerator<Point> _IndexEnumerator;
+	private FileStream[] _FileReads;
+	private ArrayPool<byte> _BufferPool;
+	private int _CumulativeBufferSize;
+
+	public LazyFileReader(Index index, string path, ArrayPool<byte> pool, bool enableSsdOptimization)
 	{
 		_Index = index;
-		OutputQueue = new();
+		PartitionQueue = new();
 		_BufferPool = pool;
+		_IndexEnumerator = _Index.List.GetEnumerator();
+
+		_FileReads = enableSsdOptimization ?
+					   new FileStream[FILE_THREADS_COUNT_SSD] :
+					   new FileStream[FILE_THREADS_COUNT_HDD];
+		for (int i = 0; i < _FileReads.Length; i++)
+		{
+			_FileReads[i] = File.OpenRead(path);
+			_FileReads[i].Position = _FileReads[i].Length / _FileReads.Length * i;
+		}
 	}
 
 	public void Dispose()
 	{
-		_File.Dispose();
+		Parallel.ForEach(_FileReads, f => f.Dispose());
 	}
 
-	public async int TryReadMore(int size, out byte[] rentBuffer)
+	private int TryReadMore(int size)
 	{
-		
-		return await _File.ReadAsync();
+		var from = _IndexEnumerator.Current ?? new Point(0, 0, 0);
+		var res = _IndexEnumerator.MoveNext();
+
+		if (!res) return 0;
+
+		var to = _IndexEnumerator.Current;
+		if (to == null) return 0;
+
+		Parallel.ForEach(_FileReads, fs => {
+			var buf = _BufferPool.Rent(_Index.ChunkMaxBytes);
+			fs.ReadExactly(buf, 0, (int)(to.Input - from.Input));
+			PartitionQueue.Enqueue((from, to, buf));
+		});
+
+		throw new NotImplementedException();
+	}
+
+	public bool TryGetNewPartition(out (Point from, Point to, byte[] segment) entry)
+	{
+		var bytesRead = 0;
+		if (_CumulativeBufferSize <= READ_BUFFER_SIZE_MAX_BYTES)
+			bytesRead = TryReadMore(READ_BUFFER_SIZE_MAX_BYTES);
+
+		if (PartitionQueue.TryDequeue(out var res))
+		{
+			_CumulativeBufferSize -= res.segment.Length;
+			entry = res;
+			return true;
+		}
+		else
+		{
+			if (bytesRead == 0)
+			{
+				entry = default;
+				return false;
+			}
+			else
+			{
+				return TryGetNewPartition(out entry);
+			}
+		}
 	}
 }
-
-// public sealed class LazyFileReadSequential : LazyFileRead
-// {
-// 	public override IEnumerator<byte[]> GetEnumerator() => _Enumerator;
-// 	private readonly FileReader _Enumerator;
-
-// 	public LazyFileReadSequential(Index index, string path)
-// 	{
-// 		var file = File.OpenRead(path);
-// 		_Enumerator = new FileReader(index, file);
-// 	}
-
-// 	public override void Dispose()
-// 	{
-// 		_Enumerator.Dispose();
-// 	}
-
-// 	private sealed class FileReader : IEnumerator<byte[]>
-// 	{
-// 		private byte[]? _Buffer;
-// 		public byte[] Current
-// 		{
-// 			get
-// 			{
-// 				if (_Buffer == null) throw new InvalidOperationException();
-// 				else return _Buffer;
-// 			}
-// 		}
-
-// 		object IEnumerator.Current => this.Current;
-
-// 		public FileReader(Index index, FileStream file)
-// 		{
-// 			_Index = index;
-// 			_File = file; 
-// 			_BinReader = new BinaryReader(file);
-// 			_ListEnumerator = index.List.GetEnumerator();
-// 			_CurrPoint = new Point(0, 0, 0);
-// 		}
-
-// 		private readonly Index _Index;
-// 		private readonly FileStream _File;
-// 		private readonly BinaryReader _BinReader;
-// 		private readonly IEnumerator<Point> _ListEnumerator;
-// 		private readonly Point _CurrPoint;
-
-// 		public void Dispose()
-// 		{
-// 			_BinReader.Dispose();
-// 			_File.Dispose();
-// 			_ListEnumerator.Dispose();
-// 		}
-
-// 		public bool MoveNext()
-// 		{
-// 			var from = (int)(_ListEnumerator.Current?.Input ?? 0);
-			
-// 			var ret = _ListEnumerator.MoveNext();
-// 			if (!ret) return false;
-// 			var to = (int)(_ListEnumerator.Current?.Input ?? _File.Length);
-
-// 			// ? might be problematic once file size > 2GB
-// 			var len = to - from;
-// 			_Buffer = new byte[len];
-// 			_File.ReadExactly(_Buffer, from, len);
-// 			return true;
-// 		}
-
-// 		void IEnumerator.Reset() => new NotSupportedException();
-// 	}
-// }

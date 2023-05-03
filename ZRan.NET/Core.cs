@@ -23,7 +23,7 @@ public static class Core
 		// Find in which "NextIn"s the checkpoints are going to appear
 		List<int> pointAppearsInInputBuffer = new List<int>();
 		GetInputBufferIndexForSlowerRead(file, chunksize, pointAppearsInInputBuffer);
-		
+
 		foreach (int idx in pointAppearsInInputBuffer)
 		{
 			Console.WriteLine(idx);
@@ -47,7 +47,7 @@ public static class Core
 
 		// Count records so we know where/when to add a point
 		int recordCounter = 0;
-		
+
 		// totout from the previous iteration
 		long prevTotout = 0;
 
@@ -94,8 +94,8 @@ public static class Core
 				bool hasPoint = pointAppearsInInputBuffer.Contains(inputBufferCounter);
 
 				strm.AvailIn = (uint)file.Read(input, 0, hasPoint ? 1 : (int)CHUNK);
-				
-				
+
+
 				// get some compressed data from input file
 				// strm.AvailIn = (uint)file.Read(input, 0, (int)CHUNK);
 
@@ -104,7 +104,7 @@ public static class Core
 					throw new ZException(ZResult.DATA_ERROR);
 				}
 				strm.NextIn = input;
-				
+
 				// process all of that, or until end of stream
 				do
 				{
@@ -165,8 +165,8 @@ public static class Core
 					var len = strm.NextOut.Length;
 					int bytesBeforeTargetAt = 0;
 
-					for (int i = ((hasPoint && prevAvailOut != 0) || (inputBufferCounter != 0 && prevAvailOut != 0)) ? len-prevAvailOut : 0; 
-						i < len-strm.AvailOut; i++)
+					for (int i = ((hasPoint && prevAvailOut != 0) || (inputBufferCounter != 0 && prevAvailOut != 0)) ? len - prevAvailOut : 0;
+						i < len - strm.AvailOut; i++)
 					{
 						var c = strm.NextOut[i];
 
@@ -184,10 +184,10 @@ public static class Core
 								long tempTotin = 0;
 								long tempTotout = 0;
 								byte[] tempWindow = new byte[WINSIZE];
-								int tempLength = len - (int)strm.AvailOut - (((hasPoint && prevAvailOut != 0) || (inputBufferCounter != 0 && prevAvailOut != 0)) ? len-prevAvailOut : 0);
+								int tempLength = len - (int)strm.AvailOut - (((hasPoint && prevAvailOut != 0) || (inputBufferCounter != 0 && prevAvailOut != 0)) ? len - prevAvailOut : 0);
 								int bytesToCopyFromPrev = 0;
 								int usefulBytesInCurrentWindow = 0;
-								
+
 								// ASSUME THE END OF A RECORD IS NEW LINE 
 								if (bytesBeforeTargetAt == 0)
 								{
@@ -213,24 +213,24 @@ public static class Core
 								// Console.WriteLine("length: " + tempLength);
 								Console.WriteLine("totin:  " + tempTotin);
 								Console.WriteLine("totout: " + tempTotout);
-								strm.NextOut.PrintASCIIFromTo((((hasPoint && prevAvailOut != 0) || (inputBufferCounter != 0 && prevAvailOut != 0)) ? len-prevAvailOut : 0), tempLength);
+								strm.NextOut.PrintASCIIFromTo((((hasPoint && prevAvailOut != 0) || (inputBufferCounter != 0 && prevAvailOut != 0)) ? len - prevAvailOut : 0), tempLength);
 							}
 						}
-						
+
 					}
 
 					prevTotout = totout;
 					Array.Copy(window, prevWindow, WINSIZE);
-					
+
 					if (strm.AvailOut > 0)
 					{
 						prevAvailOut = (int)strm.AvailOut;
 					}
-					else 
+					else
 					{
 						prevAvailOut = 0;
 					}
-					
+
 
 					// if at end of block, consider adding an index entry (note that if
 					// data_type indicates an end-of-block, then all of the
@@ -247,24 +247,24 @@ public static class Core
 					// *      or decoding the complete header up to just before the first byte 
 					// *      of the deflate stream
 				} while (strm.AvailIn != 0);
-			
+
 				if (hasPoint)
 				{
 					SingleByteReadingModeByteCounter++;
 					if (SingleByteReadingModeByteCounter < (int)CHUNK)
 					{
-						inputBufferCounter--;	
+						inputBufferCounter--;
 					}
 					else
 					{
 						SingleByteReadingModeByteCounter = 0;
 					}
 				}
-				else 
+				else
 				{
 					SingleByteReadingModeByteCounter = 0;
 				}
-				
+
 			} while (ret != ZResult.STREAM_END);
 
 			// index.length = totout;
@@ -320,7 +320,7 @@ public static class Core
 					throw new ZException(ZResult.DATA_ERROR);
 				}
 				strm.NextIn = input;
-				
+
 				// process all of that, or until end of stream
 				do
 				{
@@ -335,7 +335,7 @@ public static class Core
 					// update the total input and output counters
 					totin += strm.AvailIn;
 					totout += strm.AvailOut;
-					
+
 					// return at end of block		
 					ret = Inflate(strm, ZFlush.BLOCK);
 
@@ -359,8 +359,8 @@ public static class Core
 					}
 
 					var len = strm.NextOut.Length;
-					
-					for (int i = (inputBufferCounter != 1 && prevAvailOut != 0) ? len-prevAvailOut : 0; i < len-strm.AvailOut; i++)
+
+					for (int i = (inputBufferCounter != 1 && prevAvailOut != 0) ? len - prevAvailOut : 0; i < len - strm.AvailOut; i++)
 					{
 						var c = strm.NextOut[i];
 						// '@' = 64
@@ -374,17 +374,17 @@ public static class Core
 							}
 						}
 					}
-					
+
 					if (strm.AvailOut > 0)
 					{
 						prevAvailOut = (int)strm.AvailOut;
 					}
-					else 
+					else
 					{
 						prevAvailOut = 0;
 					}
 
-					prevRecordCounter = recordCounter;			
+					prevRecordCounter = recordCounter;
 				} while (strm.AvailIn != 0);
 			} while (ret != ZResult.STREAM_END);
 		}
@@ -568,6 +568,62 @@ public static class Core
 		}
 	}
 
+	public static int ExtractDeflateRange2(byte[] fileBuffer, Point from, Point to, byte[] buf)
+	{
+		var strm = new ZStream();
+		var input = new byte[CHUNK];
+		var discard = new byte[WINSIZE];
+		var fileBufferOffset = 0;
+		ZResult res;
+		try
+		{
+			res = InflateInit(strm, -15);
+			if (res != ZResult.OK) throw new ZException(res);
+
+			InflateSetDictionary(strm, from.Window, WINSIZE);
+
+			strm.AvailIn = 0;
+			strm.AvailOut = (uint)(to.Output - from.Output);
+			strm.NextOut = buf;
+
+			do
+			{
+				if (strm.AvailIn == 0)
+				{
+					var count = (uint)TryCopy(fileBuffer, fileBufferOffset, input, (int)CHUNK);
+					if (count == 0) throw new ZException(ZResult.DATA_ERROR);
+
+					strm.AvailIn = count;
+					strm.NextIn = input;
+				}
+
+				res = Inflate(strm, ZFlush.NO_FLUSH);
+				if (res == ZResult.MEM_ERROR ||
+					res == ZResult.DATA_ERROR ||
+					res == ZResult.NEED_DICT)
+					throw new ZException(res);
+
+				if (res == ZResult.STREAM_END)
+				{
+					if (strm.AvailIn < 8)
+					{
+						fileBufferOffset += (int)(8 - strm.AvailIn);
+						strm.AvailIn = 0;
+					}
+
+					break;
+				}
+
+			} while (strm.AvailOut != 0);
+
+			return (int)(to.Output - from.Output - strm.AvailOut);
+		}
+		finally
+		{
+			InflateEnd(strm);
+		}
+	}
+
 	// the chunk size parameter can be at most as large as 1 million
 	// otherwise it'll surpass the 2GB object limit
 	// input buffer begins with the remaining bits with a size indicated by start.Bits
@@ -592,7 +648,7 @@ public static class Core
 			ret = InflateInit(strm, -15);
 			if (ret != ZResult.OK)
 				throw new ZException(ret);
-			
+
 			// file.Seek(start.Input - (start.Bits != 0 ? 1 : 0), SeekOrigin.Begin);
 			// if (start.Bits != 0)
 			// {
@@ -693,7 +749,7 @@ public static class Core
 		}
 	}
 
-	private static int TryCopy<T>(T[] src, int srcOffset, T[] dst, 
+	private static int TryCopy<T>(T[] src, int srcOffset, T[] dst,
 		int length) where T : unmanaged
 	{
 		var minDstLen = Math.Min(dst.Length, length);

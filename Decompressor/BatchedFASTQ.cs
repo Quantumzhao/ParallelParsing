@@ -61,11 +61,12 @@ class BatchedFASTQ : IEnumerable<FASTQRecord>, IDisposable
 				if (_Reader.TryGetNewPartition(out var entry))
 				{
 					// TODO: Make it parallel
-					(var point, var len, var inBuf) = entry;
+					(var from, var to, var inBuf) = entry;
 					var buf = BufferPool.Rent(_Index.ChunkMaxBytes);
-					Core.ExtractDeflateRange(inBuf, point, buf, len);
+					Core.ExtractDeflateRange2(inBuf, from, to, buf);
 					var rs = FASTQRecord.Parse(new Queue<char>(buf.Select(b => (char)b)));
 					BufferPool.Return(buf);
+					BufferPool.Return(inBuf);
 					Parallel.ForEach(rs, (r, _) => RecordCache.Enqueue(r));
 				}
 			}

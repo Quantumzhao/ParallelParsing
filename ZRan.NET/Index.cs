@@ -9,7 +9,7 @@ public sealed class Index
 	public List<Point> List;
 	// chunk size
 	public uint ChunkSize;
-	public int ChunkMaxSize;
+	public int ChunkMaxBytes;
 
 	public Index(uint chunksize)
 	{
