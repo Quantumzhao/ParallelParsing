@@ -1,7 +1,7 @@
 
 namespace ParallelParsing.ZRan.NET;
 
-internal static class Debug
+public static class Debug
 {
 	public static void Print(this byte[] arr, int first = int.MaxValue)
 	{
@@ -32,5 +32,26 @@ internal static class Debug
 		Console.WriteLine("-------------------------- last " + first + " characters--------------------------");
 		Console.Write(System.Text.Encoding.UTF8.GetString(arr).Substring(Math.Max(0, arr.Length - first)));
 		Console.WriteLine();
+	}
+
+	public static Index BuildDummyIndex(FileStream file, uint chunksize)
+	{
+		using var sr = new StreamReader(file);
+		var index = new Index(chunksize);
+		while (!sr.EndOfStream)
+		{
+			for (int i = 0; i < 4 * chunksize; i++)
+			{
+				sr.ReadLine();
+			}
+			index.AddPoint(0, file.Position, file.Position, new byte[Constants.WINSIZE]);
+		}
+
+		return index;
+	}
+
+	public static void ExtractDummyRange(byte[] fileBuffer, Point from, Point to, byte[] buf)
+	{
+		Array.Copy(fileBuffer, buf, to.Input - from.Input);
 	}
 }

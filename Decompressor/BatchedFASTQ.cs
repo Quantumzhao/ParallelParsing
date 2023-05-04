@@ -13,8 +13,9 @@ class BatchedFASTQ : IEnumerable<FASTQRecord>, IDisposable
 {
 
 	public BatchedFASTQ(string indexPath, string gzipPath, bool enableSsdOptimization)
+		: this(IndexIO.Deserialize(indexPath), gzipPath, enableSsdOptimization) { }
+	public BatchedFASTQ(Index index, string gzipPath, bool enableSsdOptimization)
 	{
-		var index = IndexIO.Deserialize(indexPath);
 		_Enumerator = new Enumerator(index, gzipPath, enableSsdOptimization);
 	}
 
@@ -63,7 +64,7 @@ class BatchedFASTQ : IEnumerable<FASTQRecord>, IDisposable
 					// TODO: Make it parallel
 					(var from, var to, var inBuf) = entry;
 					var buf = BufferPool.Rent(_Index.ChunkMaxBytes);
-					Core.ExtractDeflateRange2(inBuf, from, to, buf);
+					Debug.ExtractDummyRange(inBuf, from, to, buf);
 					var rs = FASTQRecord.Parse(new Queue<char>(buf.Select(b => (char)b)));
 					BufferPool.Return(buf);
 					BufferPool.Return(inBuf);

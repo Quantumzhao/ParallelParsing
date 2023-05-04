@@ -50,6 +50,7 @@ public class LazyFileReader : IDisposable
 	{
 		var from = _IndexEnumerator.Current ?? new Point(0, 0, 0);
 		var res = _IndexEnumerator.MoveNext();
+		var bytesRead = 0;
 
 		if (!res) return 0;
 
@@ -60,9 +61,11 @@ public class LazyFileReader : IDisposable
 			var buf = _BufferPool.Rent(_Index.ChunkMaxBytes);
 			fs.ReadExactly(buf, 0, (int)(to.Input - from.Input));
 			PartitionQueue.Enqueue((from, to, buf));
+			bytesRead += buf.Length;
 		});
 
-		throw new NotImplementedException();
+		_CumulativeBufferSize += bytesRead;
+		return bytesRead;
 	}
 
 	public bool TryGetNewPartition(out (Point from, Point to, byte[] segment) entry)

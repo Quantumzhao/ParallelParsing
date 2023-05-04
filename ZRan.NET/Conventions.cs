@@ -35,16 +35,11 @@ public static class Constants
 {
 	public const string ZLIB_VERSION = "1.2.11";
 
-	// desired distance between access points
-	public const long SPAN = 10485760L;
-
 	// sliding window size
 	public const uint WINSIZE = 32768U;
 
 	// file input buffer size
 	public const uint CHUNK = 16384;
-
-	public const int EOF = -1;
 }
 
 public class ZException : Exception

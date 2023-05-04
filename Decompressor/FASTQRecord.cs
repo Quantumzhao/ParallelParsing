@@ -108,8 +108,6 @@ public struct FASTQRecord
 		{
 			var c = raw.Dequeue();
 			if (IsNewLine(c)) return seq.ToArray();
-			else if (!char.IsLetter(c)) 
-				throw new InvalidOperationException("Sequence contains non-ASCII characters");
 			else seq.Add(c);
 		}
 
