@@ -27,17 +27,12 @@ public struct FASTQRecord
 		List<FASTQRecord> ret = new List<FASTQRecord>();
 		while (raw.Count != 0)
 		{
-			// beginning of a record
-			SkipWhiteSpaceNewLine(raw);
 			// the trailing new lines
-			if (raw.Count == 0) return ret;
+			if (raw.Count == 0 || raw.Peek() == '\0') return ret;
 
 			id = ParseID(raw);
-			SkipWhiteSpaceNewLine(raw);
 			seq = ParseSequence(raw);
-			SkipWhiteSpaceNewLine(raw);
 			other = ParsePlus(raw);
-			SkipWhiteSpaceNewLine(raw);
 			quality = ParseQuality(raw);
 
 			ret.Add(new FASTQRecord(id, seq, other, quality));
@@ -48,7 +43,7 @@ public struct FASTQRecord
 
 	private static string ParseID(Queue<char> raw)
 	{
-		if (!raw.TryDequeue(out var prefix) || prefix =='@')
+		if (!raw.TryDequeue(out var prefix) || prefix !='@')
 			throw new InvalidOperationException("This is not a ID");
 
 		var sb = new StringBuilder();
@@ -65,7 +60,7 @@ public struct FASTQRecord
 
 	private static string ParsePlus(Queue<char> raw)
 	{
-		if (!raw.TryDequeue(out var prefix) || prefix =='+')
+		if (!raw.TryDequeue(out var prefix) || prefix !='+')
 			throw new InvalidOperationException("Field3 error: not starting with +");
 
 		var sb = new StringBuilder();
@@ -82,7 +77,6 @@ public struct FASTQRecord
 
 	private static char[] ParseSequence(Queue<char> raw)
 	{
-
 		var seq = new List<char>();
 
 		while (raw.Count != 0)
@@ -99,9 +93,6 @@ public struct FASTQRecord
 
 	private static char[] ParseQuality(Queue<char> raw)
 	{
-		if (!raw.TryDequeue(out var prefix) || prefix =='@')
-			throw new InvalidOperationException("This is not a ID");
-
 		var seq = new List<char>();
 
 		while (raw.Count != 0)
