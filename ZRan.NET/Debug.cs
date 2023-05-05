@@ -38,13 +38,18 @@ public static class Debug
 	{
 		using var sr = new StreamReader(file);
 		var index = new Index(chunksize);
-		while (!sr.EndOfStream)
+		
+		var newLineCounter = 0;
+		while (file.Position != file.Length)
 		{
-			for (int i = 0; i < 4 * chunksize; i++)
+			var b = (byte)file.ReadByte();
+			if (b == '\n') newLineCounter++;
+
+			if (newLineCounter == 4 * chunksize)
 			{
-				sr.ReadLine();
+				index.AddPoint(0, file.Position, file.Position, new byte[Constants.WINSIZE]);
+				newLineCounter = 0;
 			}
-			index.AddPoint(0, file.Position, file.Position, new byte[Constants.WINSIZE]);
 		}
 
 		return index;

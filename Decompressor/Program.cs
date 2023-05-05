@@ -19,9 +19,9 @@ public class Program
     public static int readByteSize = 64;
     static void Main(string[] args)
     {
-        var gzipPath = "./../Gzipped_FASTQ_Files/SRR11192680.fastq";
+        var gzipPath = "./../Gzipped_FASTQ_Files/test1.fastq";
         var fs = File.OpenRead(gzipPath);
-        var index = Debug.BuildDummyIndex(fs, 200);
+        var index = Debug.BuildDummyIndex(fs, 10);
         fs.Dispose();
 
         fs = File.OpenRead(gzipPath);
