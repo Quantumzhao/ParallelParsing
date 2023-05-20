@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.IO.Compression;
+using ParallelParsing;
 
 public class FileCompressionModeExample
 {
@@ -9,26 +10,29 @@ public class FileCompressionModeExample
 
     public static void Main()
     {
-        DecompressFile();
-        PrintResults();
+        var ms = DecompressFile();
+        var entries = FASTQRecord.Parse(ms.GetBuffer());
+        PrintResults(ms);
+        ms.Dispose();
     }
 
-
-    private static void DecompressFile()
+    private static MemoryStream DecompressFile()
     {
         using FileStream compressedFileStream = File.Open(CompressedFileName, FileMode.Open);
-        using FileStream outputFileStream = File.Create(DecompressedFileName);
+        var memoryStream = new MemoryStream();
         using var decompressor = new GZipStream(compressedFileStream, CompressionMode.Decompress);
-        decompressor.CopyTo(outputFileStream);
+        decompressor.CopyTo(memoryStream);
+
+        return memoryStream;
     }
 
-    private static void PrintResults()
+    private static void PrintResults(MemoryStream ms)
     {
         long compressedSize = new FileInfo(CompressedFileName).Length;
-        long decompressedSize = new FileInfo(DecompressedFileName).Length;
+        long decompressedSize = ms.Length;
 
         Console.WriteLine($"The compressed file '{CompressedFileName}' weighs {compressedSize} bytes.");
-        Console.WriteLine($"The decompressed file '{DecompressedFileName}' weighs {decompressedSize} bytes.");
+        Console.WriteLine($"The decompressed object weighs {decompressedSize} bytes.");
         Console.WriteLine($"Decompressed file size is {(float)decompressedSize/(float)compressedSize} times of the compressed file size.");
     }
 
