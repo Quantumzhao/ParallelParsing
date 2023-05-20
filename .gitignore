@@ -3,6 +3,5 @@
 bin/
 obj/
 .vscode/
-Gzipped_FASTQ_Files/SRR21524988.fastq.gz
-gztool/gztool
 .fake
+Benchmark/Samples/*
