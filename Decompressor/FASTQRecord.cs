@@ -1,11 +1,12 @@
 
+using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace ParallelParsing;
 
-public struct FASTQRecord
+public unsafe struct FASTQRecord
 {
-	public FASTQRecord(string id, char[] seq, string other, char[] q)
+	public FASTQRecord(string id, string seq, string other, string q)
 	{
 		Identifier = id;
 		Sequence = seq;
@@ -14,119 +15,170 @@ public struct FASTQRecord
 	}
 
 	public readonly string Identifier;
-	public readonly char[] Sequence;
+	public readonly string Sequence;
 	public readonly string Other;
-	public readonly char[] Quality;
+	public readonly string Quality;
 
-	public static IReadOnlyList<FASTQRecord> Parse(Queue<char> raw)
+	// public static IReadOnlyList<FASTQRecord> Parse(Queue<char> raw)
+	// {
+	// 	string id;
+	// 	char[] seq;
+	// 	string other;
+	// 	char[] quality;
+	// 	List<FASTQRecord> ret = new List<FASTQRecord>();
+	// 	while (raw.Count != 0)
+	// 	{
+	// 		// the trailing new lines
+	// 		if (raw.Count == 0 || raw.Peek() == '\0') return ret;
+
+	// 		id = ParseID(raw);
+	// 		seq = ParseSequence(raw);
+	// 		other = ParsePlus(raw);
+	// 		quality = ParseQuality(raw);
+
+	// 		ret.Add(new FASTQRecord(id, seq, other, quality));
+	// 	}
+
+	// 	return ret;
+	// }
+
+	public static IReadOnlyList<FASTQRecord> Parse(byte[] raw)
 	{
 		string id;
-		char[] seq;
+		string seq;
 		string other;
-		char[] quality;
+		string quality;
 		List<FASTQRecord> ret = new List<FASTQRecord>();
-		while (raw.Count != 0)
+
+		fixed (byte* start = raw)
 		{
-			// the trailing new lines
-			if (raw.Count == 0 || raw.Peek() == '\0') return ret;
+			var curr = start;
+			for (int i = 0; (curr - start) < raw.Length; i++)
+			{
+				// emtry space
+				if (*curr == '\0') return ret;
 
-			id = ParseID(raw);
-			seq = ParseSequence(raw);
-			other = ParsePlus(raw);
-			quality = ParseQuality(raw);
+				// skip @
+				curr++;
+				id = ParseLine(&curr);
+				seq = ParseLine(&curr);
+				// skip +
+				curr++;
+				other = ParseLine(&curr);
+				quality = ParseLine(&curr);
 
-			ret.Add(new FASTQRecord(id, seq, other, quality));
+				ret.Add(new FASTQRecord(id, seq, other, quality));
+			}
+
 		}
 
 		return ret;
 	}
 
-	private static string ParseID(Queue<char> raw)
+	private static string ParseLine(byte** currChar)
 	{
-		if (!raw.TryDequeue(out var prefix) || prefix !='@')
-			throw new InvalidOperationException("This is not a ID");
-
 		var sb = new StringBuilder();
 
-		while (raw.Count != 0)
+		while (!IsNewLine(**currChar))
 		{
-			var c = raw.Dequeue();
-			if (IsNewLine(c)) return sb.ToString();
-			else sb.Append(c);
+			if (IsNewLine(**currChar)) break;
+			else sb.Append((char)**currChar);
+
+			(*currChar)++;
 		}
 
+		// consume \n
+		(*currChar)++;
 		return sb.ToString();
 	}
 
-	private static string ParsePlus(Queue<char> raw)
-	{
-		if (!raw.TryDequeue(out var prefix) || prefix !='+')
-			throw new InvalidOperationException("Field3 error: not starting with +");
 
-		var sb = new StringBuilder();
+	// private static string ParseID(byte** currChar)
+	// {
+	// 	if (**currChar != '@') throw new InvalidOperationException("This is not a ID");
 
-		while (raw.Count != 0)
-		{
-			var c = raw.Dequeue();
-			if (IsNewLine(c)) return sb.ToString();
-			else sb.Append(c);
-		}
+	// 	var sb = new StringBuilder();
 
-		return sb.ToString();
-	}
+	// 	while (!IsNewLine(**currChar))
+	// 	{
+	// 		if (IsNewLine(**currChar)) break;
+	// 		else sb.Append(**currChar);
 
-	private static char[] ParseSequence(Queue<char> raw)
-	{
-		var seq = new List<char>();
+	// 		(*currChar)++;
+	// 	}
 
-		while (raw.Count != 0)
-		{
-			var c = raw.Dequeue();
-			if (IsNewLine(c)) return seq.ToArray();
-			else if (!char.IsLetter(c)) 
-				throw new InvalidOperationException("Sequence contains non-ASCII characters");
-			else seq.Add(c);
-		}
+	// 	return sb.ToString();
+	// }
 
-		return seq.ToArray();
-	}
+	// private static string ParsePlus(byte** currChar)
+	// {
+	// 	var sb = new StringBuilder();
 
-	private static char[] ParseQuality(Queue<char> raw)
-	{
-		var seq = new List<char>();
+	// 	while (!IsNewLine(**currChar))
+	// 	{
+	// 		if (IsNewLine(**currChar)) break;
+	// 		else sb.Append(**currChar);
 
-		while (raw.Count != 0)
-		{
-			var c = raw.Dequeue();
-			if (IsNewLine(c)) return seq.ToArray();
-			else seq.Add(c);
-		}
+	// 		(*currChar)++;
+	// 	}
 
-		return seq.ToArray();
-	}
+	// 	return sb.ToString();
+	// }
 
-	private static void SkipWhiteSpaceNewLine(Queue<char> raw)
-	{
-		while (raw.Count != 0)
-		{
-			var c = raw.Dequeue();
-			if (char.IsWhiteSpace(c)) continue;
-			if (c == '\r' || c == '\n') continue;
-			else return;
-		}
-	}
+	// private static string ParseSequence(byte[] raw, ref int* offset)
+	// {
+	// 	var sb = new StringBuilder();
 
-	private static bool IsNewLine(Queue<char> raw)
-	{
-		if (raw.TryPeek(out var c1) && c1 == '\r') raw.Dequeue();
+	// 	for (; *offset != raw.Length; offset++)
+	// 	{
+	// 		var c = (char)raw[offset];
+	// 		if (IsNewLine(c)) return sb.ToString();
+	// 		else if (!char.IsLetter(c)) 
+	// 			throw new InvalidOperationException("Sequence contains non-ASCII characters");
+	// 		else sb.Append(c);
+	// 	}
 
-		if (raw.TryPeek(out var c2) && c2 == '\n')
-		{
-			raw.Dequeue();
-			return true;
-		}
+	// 	return sb.ToString();
+	// }
 
-		return false;
-	}
-	private static bool IsNewLine(char c) => c == '\n' || c == '\r';
+	// private static char[] ParseQuality(byte[] raw)
+	// {
+	// 	var seq = new List<char>();
+
+	// 	while (raw.Count != 0)
+	// 	{
+	// 		var c = raw.Dequeue();
+	// 		if (IsNewLine(c)) return seq.ToArray();
+	// 		else seq.Add(c);
+	// 	}
+
+	// 	return seq.ToArray();
+	// }
+
+	// private static void SkipWhiteSpaceNewLine(Queue<char> raw)
+	// {
+	// 	while (raw.Count != 0)
+	// 	{
+	// 		var c = raw.Dequeue();
+	// 		if (char.IsWhiteSpace(c)) continue;
+	// 		if (c == '\r' || c == '\n') continue;
+	// 		else return;
+	// 	}
+	// }
+
+	// private static bool IsNewLine(Queue<char> raw)
+	// {
+	// 	if (raw.TryPeek(out var c1) && c1 == '\r') raw.Dequeue();
+
+	// 	if (raw.TryPeek(out var c2) && c2 == '\n')
+	// 	{
+	// 		raw.Dequeue();
+	// 		return true;
+	// 	}
+
+	// 	return false;
+	// }
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	private static bool IsNewLine(byte c) => c == '\n' || c == '\r';
 }

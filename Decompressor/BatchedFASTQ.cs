@@ -65,7 +65,7 @@ class BatchedFASTQ : IEnumerable<FASTQRecord>, IDisposable
 					(var from, var to, var inBuf) = entry;
 					var buf = BufferPool.Rent(_Index.ChunkMaxBytes);
 					Debug.ExtractDummyRange(inBuf, from, to, buf);
-					var rs = FASTQRecord.Parse(new Queue<char>(buf.Select(b => (char)b)));
+					var rs = FASTQRecord.Parse(buf);
 					BufferPool.Return(buf);
 					BufferPool.Return(inBuf);
 					Parallel.ForEach(rs, (r, _) => RecordCache.Enqueue(r));
