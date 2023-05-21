@@ -48,14 +48,18 @@ public class LazyFileReader : IDisposable
 
 	private int TryReadMore(int size)
 	{
-		var from = _IndexEnumerator.Current ?? new Point(0, 0, 0);
-		var res = _IndexEnumerator.MoveNext();
+		Point? from;
+		Point? to;
+		bool res;
+		lock (_IndexEnumerator)
+		{
+			from = _IndexEnumerator.Current ?? new Point(0, 0, 0);
+			res = _IndexEnumerator.MoveNext();		
+			if (!res) return 0;
+			to = _IndexEnumerator.Current;
+			if (to == null) return 0;
+		}
 		var bytesRead = 0;
-
-		if (!res) return 0;
-
-		var to = _IndexEnumerator.Current;
-		if (to == null) return 0;
 
 		Parallel.ForEach(_FileReads, fs => {
 			var buf = _BufferPool.Rent(_Index.ChunkMaxBytes);
@@ -70,9 +74,11 @@ public class LazyFileReader : IDisposable
 
 	public bool TryGetNewPartition(out (Point from, Point to, byte[] segment) entry)
 	{
-		var bytesRead = 0;
+		Task<int> readBytes;
+		int prevSize = _CumulativeBufferSize;
 		if (_CumulativeBufferSize <= READ_BUFFER_SIZE_MAX_BYTES)
-			bytesRead = TryReadMore(READ_BUFFER_SIZE_MAX_BYTES);
+			readBytes = Task.Run(() => TryReadMore(READ_BUFFER_SIZE_MAX_BYTES));
+		else readBytes = Task.Run(() => 0);
 
 		if (PartitionQueue.TryDequeue(out var res))
 		{
@@ -82,14 +88,25 @@ public class LazyFileReader : IDisposable
 		}
 		else
 		{
-			if (bytesRead == 0)
+			if (readBytes.Status == TaskStatus.RanToCompletion && _CumulativeBufferSize == prevSize)
 			{
 				entry = default;
 				return false;
 			}
 			else
 			{
-				return TryGetNewPartition(out entry);
+				readBytes.Wait();
+				if (PartitionQueue.TryDequeue(out res))
+				{
+					_CumulativeBufferSize -= res.segment.Length;
+					entry = res;
+					return true;
+				}
+				else
+				{
+					entry = default;
+					return false;
+				}
 			}
 		}
 	}

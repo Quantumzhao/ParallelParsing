@@ -21,15 +21,19 @@ public class Program
     {
         var gzipPath = "./../Gzipped_FASTQ_Files/SRR24496856_32.fastq";
         var fs = File.OpenRead(gzipPath);
-        var index = Debug.BuildDummyIndex(fs, 10000);
+        var index = Debug.BuildDummyIndex(fs, 5000);
         fs.Dispose();
 
         fs = File.OpenRead(gzipPath);
+        var sw = new Stopwatch();
+        sw.Start();
         var fastq = new BatchedFASTQ(index, gzipPath, false);
         foreach (var r in fastq)
         {
             r.ToString();
         }
+        sw.Stop();
+        Console.WriteLine(sw.ElapsedMilliseconds);
         fs.Dispose();
 
         // var gzipPath = "something";

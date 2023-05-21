@@ -11,7 +11,6 @@ namespace ParallelParsing;
 
 class BatchedFASTQ : IEnumerable<FASTQRecord>, IDisposable
 {
-
 	public BatchedFASTQ(string indexPath, string gzipPath, bool enableSsdOptimization)
 		: this(IndexIO.Deserialize(indexPath), gzipPath, enableSsdOptimization) { }
 	public BatchedFASTQ(Index index, string gzipPath, bool enableSsdOptimization)
@@ -61,14 +60,15 @@ class BatchedFASTQ : IEnumerable<FASTQRecord>, IDisposable
 			{
 				if (_Reader.TryGetNewPartition(out var entry))
 				{
-					// TODO: Make it parallel
-					(var from, var to, var inBuf) = entry;
-					var buf = BufferPool.Rent(_Index.ChunkMaxBytes);
-					Debug.ExtractDummyRange(inBuf, from, to, buf);
-					var rs = FASTQRecord.Parse(buf);
-					BufferPool.Return(buf);
-					BufferPool.Return(inBuf);
-					Parallel.ForEach(rs, (r, _) => RecordCache.Enqueue(r));
+					Task.Run(() => {
+						(var from, var to, var inBuf) = entry;
+						var buf = BufferPool.Rent(_Index.ChunkMaxBytes);
+						Debug.ExtractDummyRange(inBuf, from, to, buf);
+						var rs = FASTQRecord.Parse(buf);
+						BufferPool.Return(buf);
+						BufferPool.Return(inBuf);
+						Parallel.ForEach(rs, (r, _) => RecordCache.Enqueue(r));
+					});
 				}
 			}
 
