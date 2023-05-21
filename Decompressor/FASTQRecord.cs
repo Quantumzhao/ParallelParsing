@@ -1,4 +1,5 @@
 
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
 
@@ -69,7 +70,6 @@ public unsafe struct FASTQRecord
 
 				ret.Add(new FASTQRecord(id, seq, other, quality));
 			}
-
 		}
 
 		return ret;
@@ -80,8 +80,7 @@ public unsafe struct FASTQRecord
 
 		while (!IsNewLine(**currChar))
 		{
-			if (IsNewLine(**currChar)) break;
-			else sb.Append((char)**currChar);
+			sb.Append((char)**currChar);
 
 			(*currChar)++;
 		}

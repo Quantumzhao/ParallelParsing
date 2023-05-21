@@ -33,7 +33,7 @@ class BatchedFASTQ : IEnumerable<FASTQRecord>, IDisposable
 		public Enumerator(Index index, string gzipPath, bool enableSsdOptimization)
 		{
 			BufferPool = ArrayPool<byte>.Create(index.ChunkMaxBytes, 1024);
-			_Reader = new LazyFileReaderSequential(index, gzipPath, BufferPool, enableSsdOptimization);
+			_Reader = new LazyFileReader(index, gzipPath, BufferPool, enableSsdOptimization);
 			RecordCache = new();
 			_Index = index;
 			_Reader = new(index, gzipPath, BufferPool, enableSsdOptimization);
@@ -43,7 +43,7 @@ class BatchedFASTQ : IEnumerable<FASTQRecord>, IDisposable
 		public const int RECORD_CACHE_MAX_LENGTH = 1000000;
 		public ArrayPool<byte> BufferPool;
 		public ConcurrentQueue<FASTQRecord> RecordCache;
-		private LazyFileReaderSequential _Reader;
+		private LazyFileReader _Reader;
 		private Index _Index;
 		private FASTQRecord _Current;
 		public FASTQRecord Current => _Current;
@@ -54,7 +54,6 @@ class BatchedFASTQ : IEnumerable<FASTQRecord>, IDisposable
 			_Reader.Dispose();
 		}
 
-		private int counter;
 		public bool MoveNext()
 		{
 			Task populateCache;
@@ -67,6 +66,8 @@ class BatchedFASTQ : IEnumerable<FASTQRecord>, IDisposable
 					Debug.ExtractDummyRange(inBuf, from, to, buf);
 					var rs = FASTQRecord.Parse(buf);
 					// if (rs.Count != 5000) Console.WriteLine(rs.Count);
+					Array.Clear(buf);
+					Array.Clear(inBuf);
 					BufferPool.Return(buf);
 					BufferPool.Return(inBuf);
 					Parallel.ForEach(rs, (r, _) => RecordCache.Enqueue(r));

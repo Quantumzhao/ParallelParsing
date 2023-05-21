@@ -23,6 +23,7 @@ public class LazyFileReader : IDisposable
 	private FileStream[] _FileReads;
 	private ArrayPool<byte> _BufferPool;
 	private int _CumulativeBufferSize;
+	private bool _IsEOF = false;
 
 	public LazyFileReader(Index index, string path, ArrayPool<byte> pool, bool enableSsdOptimization)
 	{
@@ -54,8 +55,14 @@ public class LazyFileReader : IDisposable
 		{
 			from = _IndexEnumerator.Current ?? new Point(0, 0, 0);
 			res = _IndexEnumerator.MoveNext();		
-			if (!res) return 0;
-			to = _IndexEnumerator.Current;
+			if (res) to = _IndexEnumerator.Current;
+			else if (!_IsEOF)
+			{
+				_IsEOF = true;
+				to = new Point(0, _FileReads[0].Length, 0);
+			}
+			else return 0;
+
 			if (to == null) return 0;
 		}
 		var bytesRead = 0;
@@ -172,11 +179,9 @@ public class LazyFileReaderSequential : IDisposable
 
 	public bool TryGetNewPartition(out (Point from, Point to, byte[] segment) entry)
 	{
-		Task<int> readBytes;
 		int prevSize = _CumulativeBufferSize;
 		if (_CumulativeBufferSize <= READ_BUFFER_SIZE_MAX_BYTES)
-			readBytes = Task.Run(() => TryReadMore(READ_BUFFER_SIZE_MAX_BYTES));
-		else readBytes = Task.Run(() => 0);
+			TryReadMore(READ_BUFFER_SIZE_MAX_BYTES);
 
 		if (PartitionQueue.TryDequeue(out var res))
 		{
@@ -186,26 +191,8 @@ public class LazyFileReaderSequential : IDisposable
 		}
 		else
 		{
-			if (readBytes.Status == TaskStatus.RanToCompletion && _CumulativeBufferSize == prevSize)
-			{
-				entry = default;
-				return false;
-			}
-			else
-			{
-				readBytes.Wait();
-				if (PartitionQueue.TryDequeue(out res))
-				{
-					_CumulativeBufferSize -= res.segment.Length;
-					entry = res;
-					return true;
-				}
-				else
-				{
-					entry = default;
-					return false;
-				}
-			}
+			entry = default;
+			return false;
 		}
 	}
 }
