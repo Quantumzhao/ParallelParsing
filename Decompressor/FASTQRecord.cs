@@ -48,7 +48,7 @@ public unsafe struct FASTQRecord
 		string seq;
 		string other;
 		string quality;
-		List<FASTQRecord> ret = new List<FASTQRecord>();
+		List<FASTQRecord> ret = new List<FASTQRecord>(256);
 
 		fixed (byte* start = raw)
 		{
@@ -74,7 +74,6 @@ public unsafe struct FASTQRecord
 
 		return ret;
 	}
-
 	private static string ParseLine(byte** currChar)
 	{
 		var sb = new StringBuilder();

@@ -36,19 +36,22 @@ public static class Debug
 
 	public static Index BuildDummyIndex(FileStream file, uint chunksize)
 	{
-		using var sr = new StreamReader(file);
 		var index = new Index(chunksize);
+		var chunkBytes = 0;
 		
 		var newLineCounter = 0;
 		while (file.Position != file.Length)
 		{
 			var b = (byte)file.ReadByte();
+			chunkBytes++;
 			if (b == '\n') newLineCounter++;
 
 			if (newLineCounter == 4 * chunksize)
 			{
 				index.AddPoint(0, file.Position, file.Position, new byte[Constants.WINSIZE]);
+				index.ChunkMaxBytes = Math.Max(chunkBytes, index.ChunkMaxBytes);
 				newLineCounter = 0;
+				chunkBytes = 0;
 			}
 		}
 
