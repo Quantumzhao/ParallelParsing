@@ -33,7 +33,7 @@ class BatchedFASTQ : IEnumerable<FASTQRecord>, IDisposable
 		public Enumerator(Index index, string gzipPath, bool enableSsdOptimization)
 		{
 			BufferPool = ArrayPool<byte>.Create(index.ChunkMaxBytes, 1024);
-			_Reader = new LazyFileReader(index, gzipPath, BufferPool, enableSsdOptimization);
+			_Reader = new LazyFileReaderSequential(index, gzipPath, BufferPool, enableSsdOptimization);
 			RecordCache = new();
 			_Index = index;
 			_Reader = new(index, gzipPath, BufferPool, enableSsdOptimization);
@@ -43,7 +43,7 @@ class BatchedFASTQ : IEnumerable<FASTQRecord>, IDisposable
 		public const int RECORD_CACHE_MAX_LENGTH = 1000000;
 		public ArrayPool<byte> BufferPool;
 		public ConcurrentQueue<FASTQRecord> RecordCache;
-		private LazyFileReader _Reader;
+		private LazyFileReaderSequential _Reader;
 		private Index _Index;
 		private FASTQRecord _Current;
 		public FASTQRecord Current => _Current;
@@ -54,30 +54,41 @@ class BatchedFASTQ : IEnumerable<FASTQRecord>, IDisposable
 			_Reader.Dispose();
 		}
 
+		private int counter;
 		public bool MoveNext()
 		{
-			if (RecordCache.Count <= RECORD_CACHE_MAX_LENGTH)
+			Task populateCache;
+			if (RecordCache.Count <= RECORD_CACHE_MAX_LENGTH &&
+				_Reader.TryGetNewPartition(out var entry))
 			{
-				if (_Reader.TryGetNewPartition(out var entry))
-				{
-					Task.Run(() => {
-						(var from, var to, var inBuf) = entry;
-						var buf = BufferPool.Rent(_Index.ChunkMaxBytes);
-						Debug.ExtractDummyRange(inBuf, from, to, buf);
-						var rs = FASTQRecord.Parse(buf);
-						BufferPool.Return(buf);
-						BufferPool.Return(inBuf);
-						Parallel.ForEach(rs, (r, _) => RecordCache.Enqueue(r));
-					});
-				}
+				populateCache = Task.Run(() => {
+					(var from, var to, var inBuf) = entry;
+					var buf = BufferPool.Rent(_Index.ChunkMaxBytes);
+					Debug.ExtractDummyRange(inBuf, from, to, buf);
+					var rs = FASTQRecord.Parse(buf);
+					// if (rs.Count != 5000) Console.WriteLine(rs.Count);
+					BufferPool.Return(buf);
+					BufferPool.Return(inBuf);
+					Parallel.ForEach(rs, (r, _) => RecordCache.Enqueue(r));
+				});
 			}
+			else populateCache = Task.Run(() => { });
 
 			if (RecordCache.TryDequeue(out var res))
 			{
 				_Current = res;
 				return true;
 			}
-			else return false;
+			else
+			{
+				populateCache.Wait();
+				if (RecordCache.TryDequeue(out res))
+				{
+					_Current = res;
+					return true;
+				}
+				else return false;
+			}
 		}
 
 		void IEnumerator.Reset() => throw new NotSupportedException();
