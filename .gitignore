@@ -4,4 +4,5 @@ bin/
 obj/
 .vscode/
 .fake
-Benchmark/Samples/*
+Benchmark/BenchmarkDotNet.Artifacts/*
+**/SRR*
