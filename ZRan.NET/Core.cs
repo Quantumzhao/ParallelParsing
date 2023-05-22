@@ -577,6 +577,7 @@ public static class Core
 		var input = new byte[CHUNK];
 		var discard = new byte[WINSIZE];
 		byte[] window = new byte[WINSIZE];
+		var tempBuf = new List<byte>();
 		var fileBufferOffset = 0;
 		ZResult res;
 		try
@@ -593,7 +594,7 @@ public static class Core
 
 			do
 			{
-				if (strm.AvailIn == 0)
+				if (strm.AvailIn == 0 && strm.TotalOut == 0)
 				{
 					var count = (uint)TryCopy(fileBuffer, fileBufferOffset, input, (int)CHUNK);
 					if (count == 0) throw new ZException(ZResult.DATA_ERROR);
@@ -608,16 +609,17 @@ public static class Core
 					{
 						strm.AvailOut = WINSIZE;
 						strm.NextOut = window;
+						// strm.NextOut = new byte[WINSIZE];
 					}
 
 					// if (strm.AvailOut == 0) strm.AvailOut = WINSIZE;
-					Console.WriteLine(buf[(int)WINSIZE - 1]);
+					// Console.WriteLine(buf[(int)WINSIZE - 1]);
 
 					// Array.Clear(buf);
 					res = Inflate(strm, ZFlush.NO_FLUSH);
 					strm.NextOut.PrintASCII((int)WINSIZE-1);
-
-					
+					tempBuf.AddRange(strm.NextOut);
+					Console.WriteLine("--------------------------------");
 					//---------------------
 
 					if (res == ZResult.MEM_ERROR ||
@@ -636,7 +638,6 @@ public static class Core
 						break;
 					}
 				} while (strm.AvailIn != 0);
-				
 
 			} while (strm.AvailOut != 0);
 			// } while (strm.AvailIn != 0);
