@@ -576,6 +576,7 @@ public static class Core
 		var strm = new ZStream();
 		var input = new byte[CHUNK];
 		var discard = new byte[WINSIZE];
+		byte[] window = new byte[WINSIZE];
 		var fileBufferOffset = 0;
 		ZResult res;
 		try
@@ -586,7 +587,8 @@ public static class Core
 			InflateSetDictionary(strm, from.Window, WINSIZE);
 
 			strm.AvailIn = 0;
-			strm.AvailOut = (uint)(to.Output - from.Output);
+			// strm.AvailOut = (uint)(to.Output - from.Output);
+			strm.AvailOut = WINSIZE;
 			strm.NextOut = buf;
 
 			do
@@ -600,24 +602,44 @@ public static class Core
 					strm.NextIn = input;
 				}
 
-				res = Inflate(strm, ZFlush.NO_FLUSH);
-				if (res == ZResult.MEM_ERROR ||
-					res == ZResult.DATA_ERROR ||
-					res == ZResult.NEED_DICT)
-					throw new ZException(res);
-
-				if (res == ZResult.STREAM_END)
+				do
 				{
-					if (strm.AvailIn < 8)
+					if (strm.AvailOut == 0)
 					{
-						fileBufferOffset += (int)(8 - strm.AvailIn);
-						strm.AvailIn = 0;
+						strm.AvailOut = WINSIZE;
+						strm.NextOut = window;
 					}
 
-					break;
-				}
+					// if (strm.AvailOut == 0) strm.AvailOut = WINSIZE;
+					Console.WriteLine(buf[(int)WINSIZE - 1]);
+
+					// Array.Clear(buf);
+					res = Inflate(strm, ZFlush.NO_FLUSH);
+					strm.NextOut.PrintASCII((int)WINSIZE-1);
+
+					
+					//---------------------
+
+					if (res == ZResult.MEM_ERROR ||
+						res == ZResult.DATA_ERROR ||
+						res == ZResult.NEED_DICT)
+						throw new ZException(res);
+
+					if (res == ZResult.STREAM_END)
+					{
+						if (strm.AvailIn < 8)
+						{
+							fileBufferOffset += (int)(8 - strm.AvailIn);
+							strm.AvailIn = 0;
+						}
+
+						break;
+					}
+				} while (strm.AvailIn != 0);
+				
 
 			} while (strm.AvailOut != 0);
+			// } while (strm.AvailIn != 0);
 
 			return (int)(to.Output - from.Output - strm.AvailOut);
 		}
