@@ -60,10 +60,12 @@ public unsafe struct FASTQRecord
 				if (*curr == '\0') return ret;
 
 				// skip @
+				if (*curr != '@') throw new UnreachableException();
 				curr++;
 				id = ParseLine(&curr);
 				seq = ParseLine(&curr);
 				// skip +
+				if (*curr != '+') throw new UnreachableException();
 				curr++;
 				other = ParseLine(&curr);
 				quality = ParseLine(&curr);

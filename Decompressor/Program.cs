@@ -26,8 +26,9 @@ public class Program
         // As = 37990794
 
         // var fs = File.OpenRead(gzipPath);
-        // var index = Debug.BuildDummyIndex(fs, 5000);
+        // var index = Debug.BuildDummyIndex(fs, 10000);
         // index.Serialize("./../Gzipped_FASTQ_Files/SRR24496856_32.fastq.i");
+        // Console.WriteLine(index.List.Count);
         // fs.Dispose();
 
         // fs = File.OpenRead(gzipPath);
@@ -49,15 +50,17 @@ public class Program
 
         using var records = new BatchedFASTQ(indexPath, gzipPath, enableSsdOptimization: false);
         sw.Start();
-        var count = records.Aggregate(0, (a, x) => a + x.Sequence.Count(c => c == 'A'));
-        // var count = records.Count();
+        // var count = records.Aggregate(0, (a, x) => a + x.Sequence.Count(c => c == 'A'));
+        var count = records.Count();
         sw.Stop();
         Console.WriteLine(count);
-        Console.WriteLine("Ellapsed: " + sw.ElapsedMilliseconds);
+
+        // Console.WriteLine("Ellapsed: " + sw.ElapsedMilliseconds);
 
         // sw.Start();
         // var bytes = File.ReadAllBytes(gzipPath);
         // var res = FASTQRecord.Parse(bytes);
+        // Console.WriteLine(res.Count());
         // Console.WriteLine(res.Aggregate(0, (a, x) => a + x.Sequence.Count(c => c == 'A')));
         // sw.Stop();
         // Console.WriteLine(sw.ElapsedMilliseconds);
