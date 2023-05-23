@@ -576,8 +576,16 @@ public static class Core
 		var strm = new ZStream();
 		var input = new byte[CHUNK];
 		var discard = new byte[WINSIZE];
+		byte[] window = new byte[WINSIZE];
+
 		var fileBufferOffset = 0;
 		ZResult res;
+
+		var tempBuf = new List<byte>();
+		int prevTotout = 0;
+		int inputRange = (int)to.Input - (int)from.Input;
+
+
 		try
 		{
 			res = InflateInit(strm, -15);
@@ -586,11 +594,13 @@ public static class Core
 			InflateSetDictionary(strm, from.Window, WINSIZE);
 
 			strm.AvailIn = 0;
-			strm.AvailOut = (uint)(to.Output - from.Output);
+			// strm.AvailOut = (uint)(to.Output - from.Output);
+			strm.AvailOut = WINSIZE;
 			strm.NextOut = buf;
 
 			do
 			{
+
 				if (strm.AvailIn == 0)
 				{
 					var count = (uint)TryCopy(fileBuffer, fileBufferOffset, input, (int)CHUNK);
@@ -598,31 +608,60 @@ public static class Core
 
 					strm.AvailIn = count;
 					strm.NextIn = input;
+
+					fileBufferOffset += (int)CHUNK;
 				}
 
-				res = Inflate(strm, ZFlush.NO_FLUSH);
-				if (res == ZResult.MEM_ERROR ||
-					res == ZResult.DATA_ERROR ||
-					res == ZResult.NEED_DICT)
-					throw new ZException(res);
-
-				if (res == ZResult.STREAM_END)
+				do
 				{
-					if (strm.AvailIn < 8)
+					if (strm.AvailOut == 0)
 					{
-						fileBufferOffset += (int)(8 - strm.AvailIn);
-						strm.AvailIn = 0;
+						strm.AvailOut = WINSIZE;
+						strm.NextOut = window;
 					}
 
-					break;
-				}
+					res = Inflate(strm, ZFlush.BLOCK); 
+					// strm.NextOut.PrintASCIIFirstAndLast(1000);
 
-			} while (strm.AvailOut != 0);
+					if (!(strm.AvailIn == 0 && (int)strm.TotalIn < inputRange))
+					{
+						tempBuf.AddRange(strm.NextOut.Take((int)strm.TotalOut - prevTotout)); 
+						prevTotout = (int)strm.TotalOut;
+					}
+
+					// Console.WriteLine("--------------------------------");
+					
+					//---------------------
+
+					if (res == ZResult.MEM_ERROR ||
+						res == ZResult.DATA_ERROR ||
+						res == ZResult.NEED_DICT)
+						throw new ZException(res);
+
+					if (res == ZResult.STREAM_END)
+					{
+						if (strm.AvailIn < 8)
+						{
+							fileBufferOffset += (int)(8 - strm.AvailIn);
+							strm.AvailIn = 0;
+						}
+
+						break;
+					}
+				} while (strm.AvailIn != 0);
+
+			} while ((int)strm.TotalIn < inputRange);
+			// } while (strm.AvailIn != 0);
 
 			return (int)(to.Output - from.Output - strm.AvailOut);
 		}
 		finally
 		{
+			// convert list to array
+			buf = tempBuf.ToArray();
+			// buf.PrintASCII(buf.Count());
+			buf.PrintASCIIFirstAndLast(2000);
+
 			InflateEnd(strm);
 		}
 	}
