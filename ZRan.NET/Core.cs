@@ -577,9 +577,15 @@ public static class Core
 		var input = new byte[CHUNK];
 		var discard = new byte[WINSIZE];
 		byte[] window = new byte[WINSIZE];
-		var tempBuf = new List<byte>();
+
 		var fileBufferOffset = 0;
 		ZResult res;
+
+		var tempBuf = new List<byte>();
+		int prevTotout = 0;
+		int inputRange = (int)to.Input - (int)from.Input;
+
+
 		try
 		{
 			res = InflateInit(strm, -15);
@@ -594,13 +600,16 @@ public static class Core
 
 			do
 			{
-				if (strm.AvailIn == 0 && strm.TotalOut == 0)
+
+				if (strm.AvailIn == 0)
 				{
 					var count = (uint)TryCopy(fileBuffer, fileBufferOffset, input, (int)CHUNK);
 					if (count == 0) throw new ZException(ZResult.DATA_ERROR);
 
 					strm.AvailIn = count;
 					strm.NextIn = input;
+
+					fileBufferOffset += (int)CHUNK;
 				}
 
 				do
@@ -609,17 +618,19 @@ public static class Core
 					{
 						strm.AvailOut = WINSIZE;
 						strm.NextOut = window;
-						// strm.NextOut = new byte[WINSIZE];
 					}
 
-					// if (strm.AvailOut == 0) strm.AvailOut = WINSIZE;
-					// Console.WriteLine(buf[(int)WINSIZE - 1]);
+					res = Inflate(strm, ZFlush.BLOCK); 
+					// strm.NextOut.PrintASCIIFirstAndLast(1000);
 
-					// Array.Clear(buf);
-					res = Inflate(strm, ZFlush.NO_FLUSH);
-					strm.NextOut.PrintASCII((int)WINSIZE-1);
-					tempBuf.AddRange(strm.NextOut);
-					Console.WriteLine("--------------------------------");
+					if (!(strm.AvailIn == 0 && (int)strm.TotalIn < inputRange))
+					{
+						tempBuf.AddRange(strm.NextOut.Take((int)strm.TotalOut - prevTotout)); 
+						prevTotout = (int)strm.TotalOut;
+					}
+
+					// Console.WriteLine("--------------------------------");
+					
 					//---------------------
 
 					if (res == ZResult.MEM_ERROR ||
@@ -639,13 +650,18 @@ public static class Core
 					}
 				} while (strm.AvailIn != 0);
 
-			} while (strm.AvailOut != 0);
+			} while ((int)strm.TotalIn < inputRange);
 			// } while (strm.AvailIn != 0);
 
 			return (int)(to.Output - from.Output - strm.AvailOut);
 		}
 		finally
 		{
+			// convert list to array
+			buf = tempBuf.ToArray();
+			// buf.PrintASCII(buf.Count());
+			buf.PrintASCIIFirstAndLast(2000);
+
 			InflateEnd(strm);
 		}
 	}

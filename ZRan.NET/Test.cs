@@ -8,30 +8,87 @@ using System.IO.Compression;
 
 //Bug: when there are more than 93 points in index, it will stop running
 
-// var testFile = "../Gzipped_FASTQ_Files/SRR11192680.fastq.gz";
-var testFile = "../Gzipped_FASTQ_Files/SRR11192680.fastq.gz";
+// var testFile = "../Gzipped_FASTQ_Files/SRR24582423.fastq.gz";
+var testFile = "../Gzipped_FASTQ_Files/SRR11192680_original.fastq.gz";
 var fs = File.OpenRead(testFile);
-var i = Core.BuildDeflateIndex(fs, 200);
+var i = Core.BuildDeflateIndex(fs, 5000);
 fs.Dispose(); 
 // i.Serialize("../Gzipped_FASTQ_Files/test1.fastq.gzi");
 
+
+// fs = File.OpenRead(testFile);
+// var len_in = i.List[1].Input + 1;
+// var fileBuffer = new byte[len_in];
+// var outBuf = new byte[Constants.WINSIZE];
+// fs.Position = i.List[0].Input;
+// fs.ReadExactly(fileBuffer, 0, (int)len_in-(int)i.List[0].Input);
+// Core.ExtractDeflateRange2(fileBuffer, i.List[0], i.List[1], outBuf);
+// outBuf.PrintASCII((int)Constants.WINSIZE);
+
+// fs = File.OpenRead(testFile);
+// var len_in = i.List[1].Input - i.List[0].Input;
+// var fileBuffer = new byte[len_in];
+// var outBuf = new byte[Constants.WINSIZE];
+// fs.Position = i.List[0].Input;
+// fs.ReadExactly(fileBuffer, 0, (int)i.List[1].Input - (int)i.List[0].Input);
+// Core.ExtractDeflateRange2(fileBuffer, i.List[0], i.List[1], outBuf);
+
+
+int x = 0;
 fs = File.OpenRead(testFile);
-var len_in = i.List[1].Input + 1;
+var len_in = i.List[x+1].Input - i.List[x].Input;
 var fileBuffer = new byte[len_in];
-var outBuf = new byte[Constants.WINSIZE];
-fs.Position = 28;
-fs.ReadExactly(fileBuffer, 0, (int)len_in-29);
-Core.ExtractDeflateRange2(fileBuffer, i.List[0], i.List[1], outBuf);
-outBuf.PrintASCII((int)Constants.WINSIZE);
+var outBuf = new byte[Constants.WINSIZE]; // change size *****************************************
+fs.Position = i.List[x].Input;
+fs.ReadExactly(fileBuffer, 0, (int)i.List[x+1].Input - (int)i.List[x].Input);
+Core.ExtractDeflateRange2(fileBuffer, i.List[x], i.List[x+1], outBuf);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 // Core.ExtractDeflateIndex(fs, i, (int)i.List[1].Output, outBuf, (int)i.List[2].Output-(int)i.List[1].Output);
 // Core.ExtractDeflateIndex(fs, i, (int)i.List[1].Output, outBuf, 500);
-
-
-
-
-
 
 
 // Core.BuildDeflateIndex(fs, Constants.SPAN, 200);
