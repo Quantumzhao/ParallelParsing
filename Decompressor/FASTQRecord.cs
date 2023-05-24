@@ -42,7 +42,7 @@ public unsafe struct FASTQRecord
 
 	// 	return ret;
 	// }
-public static int counter;
+// public static int counter;
 	public static IReadOnlyList<FASTQRecord> Parse(byte[] raw)
 	{
 		string id;
@@ -65,7 +65,7 @@ public static int counter;
 				// skip @
 				if (*curr != '@') throw new Exception();
 				curr++;
-					counter++;
+					// counter++;
 				id = ParseLine(&curr);
 				seq = ParseLine(&curr);
 				// skip +

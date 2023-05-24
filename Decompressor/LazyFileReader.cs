@@ -12,7 +12,7 @@ namespace ParallelParsing;
 
 public class LazyFileReader : IDisposable
 {
-	public const int FILE_THREADS_COUNT_SSD = 2;
+	public const int FILE_THREADS_COUNT_SSD = 4;
 	public const int FILE_THREADS_COUNT_HDD = 1;
 	
 	public readonly ConcurrentQueue<(Point from, Point to, byte[] segment)> PartitionQueue;
@@ -47,11 +47,9 @@ public class LazyFileReader : IDisposable
 
 	private void TryReadMore()
 	{
-		lock (this)
-		{
+		Parallel.ForEach(_FileReads, fs => {
 			if (_IsEOF) return;
 
-			var fs = _FileReads[0];
 			Point from;
 			Point to;
 			// bool res;
@@ -80,7 +78,7 @@ public class LazyFileReader : IDisposable
 			{
 				PartitionQueue.Enqueue((from, to, buf));
 			}
-		}
+		});
 	}
 
 	public bool TryGetNewPartition(out (Point from, Point to, byte[] segment) entry)

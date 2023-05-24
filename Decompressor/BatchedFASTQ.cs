@@ -58,7 +58,7 @@ class BatchedFASTQ : IEnumerable<FASTQRecord>, IDisposable
 			// Console.WriteLine(counter);
 		}
 
-public int counter;
+// public int counter;
 		public bool MoveNext()
 		{
 			// if (RecordCache.Count == 0) Console.WriteLine(RecordCache.Count);
@@ -92,7 +92,7 @@ public int counter;
 			else
 			{
 				Task.WaitAll(_Tasks.ToArray());
-				counter++;
+				// counter++;
 				if (RecordCache.TryDequeue(out res))
 				{
 					_Current = res;
