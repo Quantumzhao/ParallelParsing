@@ -9,9 +9,9 @@ using System.IO.Compression;
 //Bug: when there are more than 93 points in index, it will stop running
 
 // var testFile = "../Gzipped_FASTQ_Files/SRR24582423.fastq.gz";
-var testFile = "../Gzipped_FASTQ_Files/SRR11192680_original.fastq.gz";
+var testFile = "../Gzipped_FASTQ_Files/SRR11192680.fastq.gz";
 var fs = File.OpenRead(testFile);
-var i = Core.BuildDeflateIndex(fs, 5000);
+var i = Core.BuildDeflateIndex(fs, span: 200);
 fs.Dispose(); 
 // i.Serialize("../Gzipped_FASTQ_Files/test1.fastq.gzi");
 
@@ -34,15 +34,18 @@ fs.Dispose();
 // Core.ExtractDeflateRange2(fileBuffer, i.List[0], i.List[1], outBuf);
 
 
-int x = 0;
+int x = 1;
 fs = File.OpenRead(testFile);
 var len_in = i.List[x+1].Input - i.List[x].Input;
+var from = i.List[x];
+var to = i.List[x + 1];
+var len_out = (int)(to.Output - from.Output);
 var fileBuffer = new byte[len_in];
 var outBuf = new byte[Constants.WINSIZE]; // change size *****************************************
 fs.Position = i.List[x].Input;
 fs.ReadExactly(fileBuffer, 0, (int)i.List[x+1].Input - (int)i.List[x].Input);
-Core.ExtractDeflateRange2(fileBuffer, i.List[x], i.List[x+1], outBuf);
-
+// Core.ExtractDeflateRange2(fileBuffer, i.List[x], i.List[x+1], outBuf);
+Core.ExtractDeflateIndex(fs, i, from.Output, outBuf, len_out);
 
 
 
