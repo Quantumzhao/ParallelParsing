@@ -42,14 +42,14 @@ public unsafe struct FASTQRecord
 
 	// 	return ret;
 	// }
-
+public static int counter;
 	public static IReadOnlyList<FASTQRecord> Parse(byte[] raw)
 	{
 		string id;
 		string seq;
 		string other;
 		string quality;
-		List<FASTQRecord> ret = new List<FASTQRecord>(256);
+		List<FASTQRecord> ret = new List<FASTQRecord>(0);
 
 		fixed (byte* start = raw)
 		{
@@ -57,15 +57,19 @@ public unsafe struct FASTQRecord
 			for (int i = 0; (curr - start) < raw.Length; i++)
 			{
 				// emtry space
-				if (*curr == '\0') return ret;
+				if (*curr == '\0')
+				{
+					return ret;
+				}
 
 				// skip @
-				if (*curr != '@') throw new UnreachableException();
+				if (*curr != '@') throw new Exception();
 				curr++;
+					counter++;
 				id = ParseLine(&curr);
 				seq = ParseLine(&curr);
 				// skip +
-				if (*curr != '+') throw new UnreachableException();
+				if (*curr != '+') throw new Exception();
 				curr++;
 				other = ParseLine(&curr);
 				quality = ParseLine(&curr);

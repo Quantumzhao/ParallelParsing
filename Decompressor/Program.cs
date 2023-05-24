@@ -50,18 +50,17 @@ public class Program
 
         using var records = new BatchedFASTQ(indexPath, gzipPath, enableSsdOptimization: false);
         sw.Start();
-        // var count = records.Aggregate(0, (a, x) => a + x.Sequence.Count(c => c == 'A'));
-        var count = records.Count();
+        var count = records.Aggregate(0, (a, x) => { Thread.Sleep(1); return a + x.Sequence.Count(c => c == 'A'); });
+        // var count = records.Count();
         sw.Stop();
         Console.WriteLine(count);
-
-        // Console.WriteLine("Ellapsed: " + sw.ElapsedMilliseconds);
+        Console.WriteLine("Ellapsed: " + sw.ElapsedMilliseconds);
 
         // sw.Start();
         // var bytes = File.ReadAllBytes(gzipPath);
         // var res = FASTQRecord.Parse(bytes);
-        // Console.WriteLine(res.Count());
-        // Console.WriteLine(res.Aggregate(0, (a, x) => a + x.Sequence.Count(c => c == 'A')));
+        // // Console.WriteLine(res.Count());
+        // Console.WriteLine(res.Aggregate(0, (a, x) => { Thread.Sleep(1); return a + x.Sequence.Count(c => c == 'A'); }));
         // sw.Stop();
         // Console.WriteLine(sw.ElapsedMilliseconds);
     }

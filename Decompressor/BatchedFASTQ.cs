@@ -38,9 +38,10 @@ class BatchedFASTQ : IEnumerable<FASTQRecord>, IDisposable
 			_Index = index;
 			_Reader = new(index, gzipPath, BufferPool, enableSsdOptimization);
 			_Current = default;
+			_Tasks = new(index.List.Count);
 		}
 		// ~ 500 MB to 1 GB
-		public const int RECORD_CACHE_MAX_LENGTH = 20000;
+		public const int RECORD_CACHE_MAX_LENGTH = 40000;
 		public ArrayPool<byte> BufferPool;
 		public ConcurrentQueue<FASTQRecord> RecordCache;
 		public LazyFileReader _Reader;
@@ -48,33 +49,39 @@ class BatchedFASTQ : IEnumerable<FASTQRecord>, IDisposable
 		private FASTQRecord _Current;
 		public FASTQRecord Current => _Current;
 		object IEnumerator.Current => this.Current;
+		private List<Task> _Tasks;
 
 		public void Dispose()
 		{
 			_Reader.Dispose();
+			// Console.WriteLine(FASTQRecord.counter);
+			// Console.WriteLine(counter);
 		}
 
+public int counter;
 		public bool MoveNext()
 		{
-			Task populateCache;
-			// Console.WriteLine(RecordCache.Count);
+			// if (RecordCache.Count == 0) Console.WriteLine(RecordCache.Count);
 			if (RecordCache.Count <= RECORD_CACHE_MAX_LENGTH &&
 				_Reader.TryGetNewPartition(out var entry))
 			{
-				populateCache = Task.Run(() => {
+				var populateCache = Task.Run(() => {
 					(var from, var to, var inBuf) = entry;
 					var buf = BufferPool.Rent(_Index.ChunkMaxBytes);
 					Debug.ExtractDummyRange(inBuf, from, to, buf);
 					var rs = FASTQRecord.Parse(buf);
+					// counter++;
+					// Console.WriteLine(FASTQRecord.counter);
 					// if (rs.Count != 10000) Console.WriteLine(rs.Count);
 					Array.Clear(buf);
 					Array.Clear(inBuf);
 					BufferPool.Return(buf);
 					BufferPool.Return(inBuf);
+					var prev = RecordCache.Count;
 					Parallel.ForEach(rs, (r, _) => RecordCache.Enqueue(r));
 				});
+				_Tasks.Add(populateCache);
 			}
-			else populateCache = Task.Run(() => { });
 
 			if (RecordCache.TryDequeue(out var res))
 			{
@@ -84,14 +91,17 @@ class BatchedFASTQ : IEnumerable<FASTQRecord>, IDisposable
 			}
 			else
 			{
-				populateCache.Wait();
-				// Console.WriteLine("wait");
+				Task.WaitAll(_Tasks.ToArray());
+				counter++;
 				if (RecordCache.TryDequeue(out res))
 				{
 					_Current = res;
 					return true;
 				}
-				else return false;
+				else
+				{
+					return false;
+				}
 			}
 		}
 

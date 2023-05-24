@@ -15,20 +15,21 @@ public class LazyFileReader : IDisposable
 	public const int FILE_THREADS_COUNT_SSD = 2;
 	public const int FILE_THREADS_COUNT_HDD = 1;
 	
-	public readonly Queue<(Point from, Point to, byte[] segment)> PartitionQueue;
+	public readonly ConcurrentQueue<(Point from, Point to, byte[] segment)> PartitionQueue;
 	private Index _Index;
-	private IEnumerator<Point> _IndexEnumerator;
+	// private IEnumerator<Point> _IndexEnumerator;
 	private FileStream[] _FileReads;
 	private ArrayPool<byte> _BufferPool;
 	private bool _IsEOF = false;
-	private bool _CanGetNewPartition = true;
+	private int _CurrPoint = -1;
+	// private bool _CanGetNewPartition = true;
 
 	public LazyFileReader(Index index, string path, ArrayPool<byte> pool, bool enableSsdOptimization)
 	{
 		_Index = index;
 		PartitionQueue = new();
 		_BufferPool = pool;
-		_IndexEnumerator = _Index.List.GetEnumerator();
+		// _IndexEnumerator = _Index.List.GetEnumerator();
 
 		_FileReads = enableSsdOptimization ?
 					   new FileStream[FILE_THREADS_COUNT_SSD] :
@@ -48,25 +49,26 @@ public class LazyFileReader : IDisposable
 	{
 		lock (this)
 		{
+			if (_IsEOF) return;
+
 			var fs = _FileReads[0];
-			Point? from;
-			Point? to;
-			bool res;
+			Point from;
+			Point to;
+			// bool res;
 			byte[] buf;
 			int len;
-			lock (_IndexEnumerator)
+			lock (this)
 			{
-				from = _IndexEnumerator.Current ?? new Point(0, 0, 0);
-				res = _IndexEnumerator.MoveNext();		
-				if (res) to = _IndexEnumerator.Current;
-				else if (!_IsEOF)
+				if (_CurrPoint == -1) from = new Point(0, 0, 0);
+				else from = _Index.List[_CurrPoint];
+
+				_CurrPoint++;
+				if (_CurrPoint < _Index.List.Count) to = _Index.List[_CurrPoint];
+				else
 				{
 					_IsEOF = true;
 					to = new Point(0, fs.Length, 0);
 				}
-				else return;
-
-				if (to == null) return;
 
 				len = (int)(to.Input - from.Input);
 			}
@@ -83,12 +85,14 @@ public class LazyFileReader : IDisposable
 
 	public bool TryGetNewPartition(out (Point from, Point to, byte[] segment) entry)
 	{
-		// if (!_CanGetNewPartition)
-		// {
-		// 	entry = default;
-		// 	return false;
-		// }
-		// if (PartitionQueue.Count <= 1) Task.Run(TryReadMore);
+		if (_IsEOF && PartitionQueue.Count == 0)
+		{
+			entry = default;
+			return false;
+		}
+
+		Task? readBytes = null;
+		if (!_IsEOF && PartitionQueue.Count <= 2) readBytes = Task.Run(TryReadMore);
 
 		if (PartitionQueue.TryDequeue(out entry))
 		{
@@ -96,21 +100,23 @@ public class LazyFileReader : IDisposable
 		}
 		else
 		{
-			int prevCount = PartitionQueue.Count;
-			var readBytes = Task.Run(TryReadMore);
+			readBytes?.Wait();
+			// if (_IsEOF && PartitionQueue.Count == 0) Console.WriteLine("here");
+			return PartitionQueue.TryDequeue(out entry);
+			// int prevCount = PartitionQueue.Count;
 
-			if (readBytes.Status == TaskStatus.RanToCompletion && PartitionQueue.Count == prevCount)
-			{
-				return false;
-			}
-			else
-			{
-				// Console.WriteLine("wait read");
-				readBytes.Wait();
-				// if (PartitionQueue.Count == 0) Console.WriteLine("here");
-				_CanGetNewPartition = PartitionQueue.TryDequeue(out entry);
-				return _CanGetNewPartition;
-			}
+			// if (readBytes.Status == TaskStatus.RanToCompletion && PartitionQueue.Count == prevCount)
+			// {
+			// 	return false;
+			// }
+			// else
+			// {
+			// 	// Console.WriteLine("wait read");
+			// 	readBytes.Wait();
+			// 	// if (PartitionQueue.Count == 0) Console.WriteLine("here");
+			// 	_CanGetNewPartition = PartitionQueue.TryDequeue(out entry);
+			// 	return _CanGetNewPartition;
+			// }
 		}
 	}
 }
