@@ -29,6 +29,10 @@ internal static class LibZ
 	public static unsafe extern ZResult inflateInit2_(
 		z_stream* strm, int windowBits, char* version, int stream_size);
 
+	[DllImport("libz", CharSet = CharSet.Ansi)]
+	public static unsafe extern ZResult inflateInit_(
+		z_stream* strm, char* version, int stream_size);
+
 	[DllImport("libz")]
 	public static unsafe extern ZResult inflateReset2(z_stream* strm, int windowBits);
 	

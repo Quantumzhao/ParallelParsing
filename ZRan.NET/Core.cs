@@ -206,7 +206,7 @@ public static class Core
 								Array.Copy(prevWindow, usefulBytesInCurrentWindow, tempWindow, 0, bytesToCopyFromPrev);
 								Array.Copy(window, 0, tempWindow, bytesToCopyFromPrev, usefulBytesInCurrentWindow);
 
-								index.AddPoint(strm.DataType & 7, tempTotin, tempTotout, tempWindow);
+								index.AddPoint(strm.DataType & 7, tempTotin, tempTotout, strm.AvailOut, tempWindow);
 								recordCounter = 1;
 								// strm.NextOut.PrintASCII(1000);
 								// Console.WriteLine("Add point----------------------------------------");
@@ -340,7 +340,7 @@ public static class Core
 					// return at end of block		
 					ret = Inflate(strm, ZFlush.BLOCK);
 					if (strm.DataType == 128 && index.List.Count == 0)
-						index.AddPoint(strm.DataType & 7, totin - strm.AvailIn, 0, window);
+						index.AddPoint(strm.DataType & 7, totin - strm.AvailIn, strm.AvailOut, 0, window);
 
 					totin -= strm.AvailIn;
 					totout -= strm.AvailOut;
@@ -497,7 +497,7 @@ public static class Core
 					if ((strm.DataType & 128) != 0 && (strm.DataType & 64) == 0 &&
 						(totout == 0 || totout - last > span))
 					{
-						index.AddPoint(strm.DataType & 7, totin, totout, window);
+						index.AddPoint(strm.DataType & 7, totin, totout, strm.AvailOut, window);
 						last = totout;
 					}
 				} while (strm.AvailIn != 0);
@@ -840,12 +840,6 @@ public static class Core
 							file.Seek(8 - strm.AvailIn, SeekOrigin.Current);
 							strm.AvailIn = 0;
 						}
-						else
-						{
-							strm.AvailIn -= 8;
-							throw new Exception();
-							// strm.next_in += 8;
-						}
 						
 						if (strm.AvailIn == 0 && file.Position == file.Length)
 							// the input ended after the gzip trailer -- done
@@ -875,7 +869,10 @@ public static class Core
 							}
 							ret = Inflate(strm, ZFlush.BLOCK);
 							if (ret == ZResult.MEM_ERROR || ret == ZResult.DATA_ERROR)
-								throw new ZException(ret);
+							{
+								InflateEnd(strm);
+								return value;
+							}
 						} while ((strm.DataType & 128) == 0);
 
 						// set up to continue decompression of the raw deflate stream

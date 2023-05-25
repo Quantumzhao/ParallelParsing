@@ -152,6 +152,13 @@ public unsafe static class Compat
 			return (ZResult)inflateInit2_(strm.Ptr, windowBits, ver, sizeof(z_stream));
 		}
 	}
+	public static ZResult InflateInit(ZStream strm)
+	{
+		fixed (char* ver = Constants.ZLIB_VERSION)
+		{
+			return (ZResult)inflateInit_(strm.Ptr, ver, sizeof(z_stream));
+		}
+	}
 
 	/// <summary>
 	/// Initializes the decompression dictionary from the given uncompressed byte sequence. 
@@ -203,5 +210,4 @@ public unsafe static class Compat
 		=> inflateReset2(strm.Ptr, windowBits);
 	
 	public static ZResult InflateReset(ZStream strm) => inflateReset(strm.Ptr);
-
 }

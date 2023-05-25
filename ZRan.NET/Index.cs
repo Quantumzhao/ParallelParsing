@@ -17,24 +17,15 @@ public sealed class Index
 		ChunkSize = chunksize;
 	}
 
-	public void AddPoint(int bits, long input, long output, byte[] window)
+	public void AddPoint(int bits, long input, long output, uint left, byte[] window)
 	{
-		if (this.List.Count == 0)
-		{
-			this.ChunkMaxBytes = (int)output;
-		}
-		else 
-		{
-			int outputSize = (int)output - (int)this.List[this.List.Count - 1].Output;
-
-			if (outputSize > this.ChunkMaxBytes)
-				this.ChunkMaxBytes = outputSize;
-		}
-		
 		Point next = new Point(output, input, bits);
 
-		Array.Copy(window, next.Window, WINSIZE);
-		
+		if (left != 0)
+			Array.Copy(window, WINSIZE - left, next.Window, 0, left);
+			
+		if (left < WINSIZE)
+			Array.Copy(window, 0, next.Window, left, WINSIZE - left);
 		this.List.Add(next);
 	}
 }

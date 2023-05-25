@@ -4,15 +4,17 @@ using System.Text;
 using ParallelParsing.ZRan.NET;
 using Index = ParallelParsing.ZRan.NET.Index;
 using System.IO.Compression;
+using static ParallelParsing.ZRan.NET.Constants;
+using static ParallelParsing.ZRan.NET.Compat;
+using SDebug = System.Diagnostics.Debug;
 
 
 //Bug: when there are more than 93 points in index, it will stop running
 
-// var testFile = "../Gzipped_FASTQ_Files/SRR24582423.fastq.gz";
-var testFile = "../Gzipped_FASTQ_Files/SRR11192680.fastq.gz";
-var fs = File.OpenRead(testFile);
-var i = Core.BuildDeflateIndex(fs, span: 200);
-fs.Dispose(); 
+// var testFile = "../Gzipped_FASTQ_Files/SRR11192680.fastq.gz";
+var testFile = "../Gzipped_FASTQ_Files/SRR11192680_original.fastq.gz";
+// var fs = File.OpenRead(testFile);
+// var i = Core.BuildDeflateIndex(fs, span: 2000);
 // i.Serialize("../Gzipped_FASTQ_Files/test1.fastq.gzi");
 
 
@@ -34,18 +36,20 @@ fs.Dispose();
 // Core.ExtractDeflateRange2(fileBuffer, i.List[0], i.List[1], outBuf);
 
 
-int x = 1;
-fs = File.OpenRead(testFile);
-var len_in = i.List[x+1].Input - i.List[x].Input;
-var from = i.List[x];
-var to = i.List[x + 1];
-var len_out = (int)(to.Output - from.Output);
-var fileBuffer = new byte[len_in];
-var outBuf = new byte[Constants.WINSIZE]; // change size *****************************************
-fs.Position = i.List[x].Input;
-fs.ReadExactly(fileBuffer, 0, (int)i.List[x+1].Input - (int)i.List[x].Input);
+// int x = 8;
+// fs.Position = 0;
+// var len_in = i.List[x+1].Input - i.List[x].Input;
+// var from = i.List[x];
+// var to = i.List[x + 1];
+// var len_out = (int)(to.Output - from.Output);
+// var fileBuffer = new byte[len_in];
+// var outBuf = new byte[4_000_000]; // change size *****************************************
+// fs.Position = i.List[x].Input;
+// fs.ReadExactly(fileBuffer, 0, (int)i.List[x+1].Input - (int)i.List[x].Input);
 // Core.ExtractDeflateRange2(fileBuffer, i.List[x], i.List[x+1], outBuf);
-Core.ExtractDeflateIndex(fs, i, from.Output, outBuf, len_out);
+// Core.ExtractDeflateIndex(fs, i, from.Output, outBuf, len_out);
+// Console.WriteLine(Encoding.ASCII.GetString(outBuf));
+// outBuf.PrintASCII(500);
 
 
 
@@ -117,3 +121,43 @@ Core.ExtractDeflateIndex(fs, i, from.Output, outBuf, len_out);
 //     fs1.Dispose();
 //     Console.WriteLine($"-------------finished building index with chunk size {j}.");
 // }
+
+using var fs = File.OpenRead(testFile);
+using var ms = new MemoryStream();
+
+ZResult ret;
+uint have;
+ZStream strm = new ZStream();
+byte[] input = new byte[CHUNK];
+byte[] output = new byte[CHUNK];
+
+ret = InflateInit(strm, 47);
+SDebug.Assert(ret == ZResult.OK);
+
+do
+{
+	strm.AvailIn = (uint)fs.Read(input, 0, (int)CHUNK);
+
+	if (strm.AvailIn == 0) break;
+	strm.NextIn = input;
+
+	do
+	{
+		strm.AvailOut = CHUNK;
+		strm.NextOut = output;
+
+		ret = Inflate(strm, ZFlush.NO_FLUSH);
+		SDebug.Assert(ret != ZResult.DATA_ERROR);
+		SDebug.Assert(ret != ZResult.STREAM_ERROR);
+
+		have = CHUNK - strm.AvailOut;
+		ms.Write(output, 0, (int)CHUNK);
+
+	} while (strm.AvailOut == 0);
+
+} while (ret != ZResult.STREAM_END);
+
+InflateEnd(strm);
+
+var str = Encoding.ASCII.GetString(ms.GetBuffer());
+Console.WriteLine(str);
