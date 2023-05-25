@@ -74,8 +74,8 @@ internal unsafe struct z_stream
 	[MarshalAs(UnmanagedType.LPStr)]
 	public IntPtr msg;
 	public void* state;
-	public delegate* unmanaged[Cdecl]<void*, uint, uint, void*> zalloc;
-	public delegate* unmanaged[Cdecl]<void*, void*, void> zfree;
+	public void* zalloc;
+	public void* zfree;
 	public void* opaque;
 	public int data_type;
 	public ulong adler;

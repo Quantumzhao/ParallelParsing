@@ -13,8 +13,8 @@ using SDebug = System.Diagnostics.Debug;
 
 // var testFile = "../Gzipped_FASTQ_Files/SRR11192680.fastq.gz";
 var testFile = "../Gzipped_FASTQ_Files/SRR11192680_original.fastq.gz";
-// var fs = File.OpenRead(testFile);
-// var i = Core.BuildDeflateIndex(fs, span: 2000);
+var fs = File.OpenRead(testFile);
+var index = Core.BuildDeflateIndex(fs, span: 1048576L);
 // i.Serialize("../Gzipped_FASTQ_Files/test1.fastq.gzi");
 
 
@@ -35,21 +35,41 @@ var testFile = "../Gzipped_FASTQ_Files/SRR11192680_original.fastq.gz";
 // fs.ReadExactly(fileBuffer, 0, (int)i.List[1].Input - (int)i.List[0].Input);
 // Core.ExtractDeflateRange2(fileBuffer, i.List[0], i.List[1], outBuf);
 
+for (int x = 0; x < index.List.Count - 1; x++)
+{
+	fs.Position = 0;
+	var len_in = index.List[x+1].Input - index.List[x].Input;
+	var from = index.List[x];
+	var to = index.List[x + 1];
+	var len_out = (int)(to.Output - from.Output);
+	var fileBuffer = new byte[len_in];
+	var outBuf = new byte[2_000_000]; // change size *****************************************
+	Core.ExtractDeflateIndex(fs, index, from.Output, outBuf, len_out);
+}
 
 // int x = 8;
 // fs.Position = 0;
-// var len_in = i.List[x+1].Input - i.List[x].Input;
-// var from = i.List[x];
-// var to = i.List[x + 1];
+// var len_in = index.List[x+1].Input - index.List[x].Input;
+// var from = index.List[x];
+// var to = index.List[x + 1];
 // var len_out = (int)(to.Output - from.Output);
 // var fileBuffer = new byte[len_in];
-// var outBuf = new byte[4_000_000]; // change size *****************************************
+// var outBuf = new byte[2_000_000]; // change size *****************************************
+// i.List.RemoveAt(3);
+
+// index.List.RemoveAt(2);
+// index.List.RemoveAt(2);
+// for (int i = 0; i < 29; i++)
+// {
+// 	index.List.RemoveAt(2);
+// }
+
 // fs.Position = i.List[x].Input;
 // fs.ReadExactly(fileBuffer, 0, (int)i.List[x+1].Input - (int)i.List[x].Input);
 // Core.ExtractDeflateRange2(fileBuffer, i.List[x], i.List[x+1], outBuf);
-// Core.ExtractDeflateIndex(fs, i, from.Output, outBuf, len_out);
+// Core.ExtractDeflateIndex(fs, index, from.Output, outBuf, len_out);
 // Console.WriteLine(Encoding.ASCII.GetString(outBuf));
-// outBuf.PrintASCII(500);
+// outBuf.PrintASCIIFirstAndLast(2000);
 
 
 
@@ -122,42 +142,42 @@ var testFile = "../Gzipped_FASTQ_Files/SRR11192680_original.fastq.gz";
 //     Console.WriteLine($"-------------finished building index with chunk size {j}.");
 // }
 
-using var fs = File.OpenRead(testFile);
-using var ms = new MemoryStream();
+// using var fs = File.OpenRead(testFile);
+// using var ms = new MemoryStream();
 
-ZResult ret;
-uint have;
-ZStream strm = new ZStream();
-byte[] input = new byte[CHUNK];
-byte[] output = new byte[CHUNK];
+// ZResult ret;
+// uint have;
+// ZStream strm = new ZStream();
+// byte[] input = new byte[CHUNK];
+// byte[] output = new byte[CHUNK];
 
-ret = InflateInit(strm, 47);
-SDebug.Assert(ret == ZResult.OK);
+// ret = InflateInit(strm, 47);
+// SDebug.Assert(ret == ZResult.OK);
 
-do
-{
-	strm.AvailIn = (uint)fs.Read(input, 0, (int)CHUNK);
+// do
+// {
+// 	strm.AvailIn = (uint)fs.Read(input, 0, (int)CHUNK);
 
-	if (strm.AvailIn == 0) break;
-	strm.NextIn = input;
+// 	if (strm.AvailIn == 0) break;
+// 	strm.NextIn = input;
 
-	do
-	{
-		strm.AvailOut = CHUNK;
-		strm.NextOut = output;
+// 	do
+// 	{
+// 		strm.AvailOut = CHUNK;
+// 		strm.NextOut = output;
 
-		ret = Inflate(strm, ZFlush.NO_FLUSH);
-		SDebug.Assert(ret != ZResult.DATA_ERROR);
-		SDebug.Assert(ret != ZResult.STREAM_ERROR);
+// 		ret = Inflate(strm, ZFlush.NO_FLUSH);
+// 		SDebug.Assert(ret != ZResult.DATA_ERROR);
+// 		SDebug.Assert(ret != ZResult.STREAM_ERROR);
 
-		have = CHUNK - strm.AvailOut;
-		ms.Write(output, 0, (int)CHUNK);
+// 		have = CHUNK - strm.AvailOut;
+// 		ms.Write(output, 0, (int)CHUNK);
 
-	} while (strm.AvailOut == 0);
+// 	} while (strm.AvailOut == 0);
 
-} while (ret != ZResult.STREAM_END);
+// } while (ret != ZResult.STREAM_END);
 
-InflateEnd(strm);
+// ret = InflateEnd(strm);
 
-var str = Encoding.ASCII.GetString(ms.GetBuffer());
-Console.WriteLine(str);
+// var str = Encoding.ASCII.GetString(ms.GetBuffer());
+// Console.WriteLine(str);
