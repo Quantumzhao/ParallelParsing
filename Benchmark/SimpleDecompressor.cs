@@ -23,7 +23,10 @@ public class SimpleDecompressor
 	public void Run()
 	{
 		if (CompressedFileStream == null) throw new NullReferenceException();
-		FASTQRecord.Parse(DecompressFile(CompressedFileStream));
+		foreach (var rs in DecompressFile(CompressedFileStream))
+		{
+			FASTQRecord.Parse(rs);
+		}
 	}
 
 	[IterationCleanup]
@@ -32,13 +35,17 @@ public class SimpleDecompressor
 		CompressedFileStream?.Dispose();
 	}
 
-	private static byte[] DecompressFile(FileStream compressedFileStream)
+	private static IEnumerable<byte[]> DecompressFile(FileStream compressedFileStream)
     {
-        using var memoryStream = new MemoryStream();
         using var decompressor = new GZipStream(compressedFileStream, CompressionMode.Decompress);
-        decompressor.CopyTo(memoryStream);
-
-        return memoryStream.GetBuffer();
+		var ret = new List<byte[]>();
+		var res = 0;
+		while (res != 0 && res < int.MaxValue)
+		{
+			var buffer = new byte[int.MaxValue];
+			res = decompressor.Read(buffer, 0, int.MaxValue);
+			yield return buffer;
+		}
     }
 
 }

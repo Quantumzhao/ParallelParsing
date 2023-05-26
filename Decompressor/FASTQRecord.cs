@@ -96,6 +96,41 @@ public unsafe struct FASTQRecord
 		return sb.ToString();
 	}
 
+	public static IEnumerable<FASTQRecord> Parse(byte[] fst, byte[] sec, RefTuple<int, int> poses)
+	{
+		var i1 = poses.First;
+		var i2 = poses.Second;
+		foreach (var item in fst)
+		{
+			yield return new FASTQRecord();
+		}
+	}
+	private static string ParseLine(byte[] fst, byte[] snd, RefTuple<int, int> poses)
+	{
+		var sb = new StringBuilder();
+		var i1 = poses.First;
+		var i2 = poses.Second;
+
+		for (; i1 < fst.Length && !IsNewLine(fst[i1]); i1++)
+		{
+			sb.Append((char)fst[i1]);
+		}
+		
+		if (i1 == fst.Length && !IsNewLine(fst[i1]))
+		{
+			for (;i2 < snd.Length && !IsNewLine(snd[i2]); i2++)
+			{
+				sb.Append(snd[i2]);
+			}
+
+			return sb.ToString();
+		}
+		else
+		{
+			return sb.ToString();
+		}
+	}
+
 
 	// private static string ParseID(byte** currChar)
 	// {
@@ -185,4 +220,10 @@ public unsafe struct FASTQRecord
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	private static bool IsNewLine(byte c) => c == '\n' || c == '\r';
+}
+
+public class RefTuple<T1, T2> where T1 : unmanaged where T2 : unmanaged
+{
+	public T1 First;
+	public T2 Second;
 }
