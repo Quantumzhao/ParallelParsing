@@ -50,26 +50,26 @@ public class Program
         // }
         // Console.WriteLine(count);
 
-        // using var records = new BatchedFASTQ(indexPath, gzipPath, enableSsdOptimization: true);
-        // sw.Start();
-        // var count = records.Aggregate(0, (a, x) => a + x.Sequence.Count(c => c == 'A'));
-        // // var count = records.Count();
-        // sw.Stop();
-        // Console.WriteLine(count);
-        // Console.WriteLine("Ellapsed: " + sw.ElapsedMilliseconds);
-
-        var bytes = File.ReadAllBytes(gzipPath32);
+        using var records = new BatchedFASTQ(indexPath32, gzipPath32, enableSsdOptimization: false);
         sw.Start();
-        var res = FASTQRecord.Parse(bytes);
+        var count = records.Aggregate(0, (a, x) => a + x.Sequence.Count(c => c == 'A'));
+        // var count = records.Count();
         sw.Stop();
-        var count = 0;
-        // foreach (var r in res)
-        // {
-        //     count++;
-        // }
-        Console.WriteLine(res.Count());
-        // Console.WriteLine(res.Aggregate(0, (a, x) => { Thread.Sleep(1); return a + x.Sequence.Count(c => c == 'A'); }));
-        Console.WriteLine(sw.ElapsedMilliseconds);
+        Console.WriteLine(count);
+        Console.WriteLine("Ellapsed: " + sw.ElapsedMilliseconds);
+
+        // var bytes = File.ReadAllBytes(gzipPath32);
+        // sw.Start();
+        // var res = FASTQRecord.Parse(bytes);
+        // sw.Stop();
+        // var count = 0;
+        // // foreach (var r in res)
+        // // {
+        // //     count++;
+        // // }
+        // Console.WriteLine(res.Count());
+        // // Console.WriteLine(res.Aggregate(0, (a, x) => { Thread.Sleep(1); return a + x.Sequence.Count(c => c == 'A'); }));
+        // Console.WriteLine(sw.ElapsedMilliseconds);
     }
 }
 

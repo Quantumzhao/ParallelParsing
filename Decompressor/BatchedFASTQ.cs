@@ -4,12 +4,13 @@ using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Text;
+using ParallelParsing.Common;
 using ParallelParsing.ZRan.NET;
 using Index = ParallelParsing.ZRan.NET.Index;
 
 namespace ParallelParsing;
 
-class BatchedFASTQ : IEnumerable<FASTQRecord>, IDisposable
+class BatchedFASTQ : IEnumerable<FastqRecord>, IDisposable
 {
 	public BatchedFASTQ(string indexPath, string gzipPath, bool enableSsdOptimization)
 		: this(IndexIO.Deserialize(indexPath), gzipPath, enableSsdOptimization) { }
@@ -20,7 +21,7 @@ class BatchedFASTQ : IEnumerable<FASTQRecord>, IDisposable
 
 	private Enumerator _Enumerator;
 
-	public IEnumerator<FASTQRecord> GetEnumerator() => _Enumerator;
+	public IEnumerator<FastqRecord> GetEnumerator() => _Enumerator;
 	IEnumerator IEnumerable.GetEnumerator() => _Enumerator;
 
 	public void Dispose()
@@ -28,7 +29,7 @@ class BatchedFASTQ : IEnumerable<FASTQRecord>, IDisposable
 		_Enumerator.Dispose();
 	}
 
-	private class Enumerator : IEnumerator<FASTQRecord>
+	private class Enumerator : IEnumerator<FastqRecord>
 	{
 		public Enumerator(Index index, string gzipPath, bool enableSsdOptimization)
 		{
@@ -43,18 +44,18 @@ class BatchedFASTQ : IEnumerable<FASTQRecord>, IDisposable
 		// ~ 500 MB to 1 GB
 		public const int RECORD_CACHE_MAX_LENGTH = 40000;
 		public ArrayPool<byte> BufferPool;
-		public ConcurrentQueue<FASTQRecord> RecordCache;
+		public ConcurrentQueue<FastqRecord> RecordCache;
 		public LazyFileReader _Reader;
 		private Index _Index;
-		private FASTQRecord _Current;
-		public FASTQRecord Current => _Current;
+		private FastqRecord _Current;
+		public FastqRecord Current => _Current;
 		object IEnumerator.Current => this.Current;
 		private List<Task> _Tasks;
 
 		public void Dispose()
 		{
 			_Reader.Dispose();
-			// Console.WriteLine(FASTQRecord.counter);
+			// Console.WriteLine(FastqRecord.counter);
 			// Console.WriteLine(counter);
 		}
 
@@ -69,9 +70,9 @@ class BatchedFASTQ : IEnumerable<FASTQRecord>, IDisposable
 					(var from, var to, var inBuf) = entry;
 					var buf = BufferPool.Rent(_Index.ChunkMaxBytes);
 					Debug.ExtractDummyRange(inBuf, from, to, buf);
-					var rs = FASTQRecord.Parse(buf);
+					var rs = Parsing.Parse(buf);
 					// counter++;
-					// Console.WriteLine(FASTQRecord.counter);
+					// Console.WriteLine(FastqRecord.counter);
 					// if (rs.Count != 10000) Console.WriteLine(rs.Count);
 					Array.Clear(buf);
 					Array.Clear(inBuf);

@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../ZRan.NET/ZRan.NET.csproj" />
+    <ProjectReference Include="../Common/Common.csproj" />
   </ItemGroup>
 
   <PropertyGroup>
