@@ -17,7 +17,28 @@ public sealed class Index
 		ChunkSize = chunksize;
 	}
 
-	public void AddPoint(int bits, long input, long output, uint left, byte[] window)
+	public void AddPoint(int bits, long input, long output, byte[] window)
+	{
+		if (this.List.Count == 0)
+		{
+			this.ChunkMaxBytes = (int)output;
+		}
+		else 
+		{
+			int outputSize = (int)output - (int)this.List[this.List.Count - 1].Output;
+
+			if (outputSize > this.ChunkMaxBytes)
+				this.ChunkMaxBytes = outputSize;
+		}
+		
+		Point next = new Point(output, input, bits);
+
+		Array.Copy(window, next.Window, WINSIZE);
+		
+		this.List.Add(next);
+	}
+
+	public void AddPoint_OLD(int bits, long input, long output, uint left, byte[] window)
 	{
 		Point next = new Point(output, input, bits);
 
@@ -35,9 +56,11 @@ public sealed class Point
 	// corresponding offset in uncompressed data
 	public readonly long Output;
 	// offset in input file of first full byte
-	public readonly long Input;
+	// public readonly long Input;
+	public  long Input;
 	// number of bits (1-7) from byte at in-1, or 0
-	public readonly int Bits;
+	// public readonly int Bits;
+	public int Bits;
 	// preceding 32K of uncompressed data
 	public readonly byte[] Window;
 

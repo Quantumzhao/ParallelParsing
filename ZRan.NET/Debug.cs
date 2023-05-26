@@ -48,7 +48,7 @@ public static class Debug
 
 			if (newLineCounter == 4 * chunksize)
 			{
-				index.AddPoint(0, file.Position, file.Position, 0, new byte[Constants.WINSIZE]);
+				index.AddPoint_OLD(0, file.Position, file.Position, 0, new byte[Constants.WINSIZE]);
 				index.ChunkMaxBytes = Math.Max(chunkBytes, index.ChunkMaxBytes);
 				newLineCounter = 0;
 				chunkBytes = 0;

@@ -14,63 +14,36 @@ using SDebug = System.Diagnostics.Debug;
 // var testFile = "../Gzipped_FASTQ_Files/SRR11192680.fastq.gz";
 var testFile = "../Gzipped_FASTQ_Files/SRR11192680_original.fastq.gz";
 var fs = File.OpenRead(testFile);
-var index = Core.BuildDeflateIndex(fs, span: 1048576L);
+// var index = Core.BuildDeflateIndex_OLD(fs, span: 1048576L);
+var index = Core.BuildDeflateIndex(fs, chunksize: 2000);
 // i.Serialize("../Gzipped_FASTQ_Files/test1.fastq.gzi");
 
 
-// fs = File.OpenRead(testFile);
-// var len_in = i.List[1].Input + 1;
-// var fileBuffer = new byte[len_in];
-// var outBuf = new byte[Constants.WINSIZE];
-// fs.Position = i.List[0].Input;
-// fs.ReadExactly(fileBuffer, 0, (int)len_in-(int)i.List[0].Input);
-// Core.ExtractDeflateRange2(fileBuffer, i.List[0], i.List[1], outBuf);
-// outBuf.PrintASCII((int)Constants.WINSIZE);
-
-// fs = File.OpenRead(testFile);
-// var len_in = i.List[1].Input - i.List[0].Input;
-// var fileBuffer = new byte[len_in];
-// var outBuf = new byte[Constants.WINSIZE];
-// fs.Position = i.List[0].Input;
-// fs.ReadExactly(fileBuffer, 0, (int)i.List[1].Input - (int)i.List[0].Input);
-// Core.ExtractDeflateRange2(fileBuffer, i.List[0], i.List[1], outBuf);
-
-for (int x = 0; x < index.List.Count - 1; x++)
-{
-	fs.Position = 0;
-	var len_in = index.List[x+1].Input - index.List[x].Input;
-	var from = index.List[x];
-	var to = index.List[x + 1];
-	var len_out = (int)(to.Output - from.Output);
-	var fileBuffer = new byte[len_in];
-	var outBuf = new byte[2_000_000]; // change size *****************************************
-	Core.ExtractDeflateIndex(fs, index, from.Output, outBuf, len_out);
-}
-
-// int x = 8;
-// fs.Position = 0;
-// var len_in = index.List[x+1].Input - index.List[x].Input;
-// var from = index.List[x];
-// var to = index.List[x + 1];
-// var len_out = (int)(to.Output - from.Output);
-// var fileBuffer = new byte[len_in];
-// var outBuf = new byte[2_000_000]; // change size *****************************************
-// i.List.RemoveAt(3);
-
-// index.List.RemoveAt(2);
-// index.List.RemoveAt(2);
-// for (int i = 0; i < 29; i++)
+// for (int x = 0; x < index.List.Count - 1; x++)
 // {
-// 	index.List.RemoveAt(2);
+// 	fs.Position = 0;
+// 	var len_in = index.List[x+1].Input - index.List[x].Input;
+// 	var from = index.List[x];
+// 	var to = index.List[x + 1];
+// 	var len_out = (int)(to.Output - from.Output);
+// 	var fileBuffer = new byte[len_in];
+// 	var outBuf = new byte[2_000_000]; // change size *****************************************
+// 	Core.ExtractDeflateIndex_OLD(fs, index, from.Output, outBuf, len_out);
+//     outBuf.PrintASCII(2000000);
 // }
 
-// fs.Position = i.List[x].Input;
-// fs.ReadExactly(fileBuffer, 0, (int)i.List[x+1].Input - (int)i.List[x].Input);
-// Core.ExtractDeflateRange2(fileBuffer, i.List[x], i.List[x+1], outBuf);
-// Core.ExtractDeflateIndex(fs, index, from.Output, outBuf, len_out);
-// Console.WriteLine(Encoding.ASCII.GetString(outBuf));
-// outBuf.PrintASCIIFirstAndLast(2000);
+// index.List[2].Input--;
+// index.List[1].Bits = 6;
 
+int x = 1;
+fs.Position = 0;
+var from = index.List[x];
+var to = index.List[x + 1];
+var outBuf = new byte[2_000_000]; // change size *****************************************
+Core.ExtractDeflateIndex(fs, index, from.Output, outBuf, (int)(to.Output - from.Output));
+outBuf.PrintASCII(2000000);
+
+int xx = 0;
 
 
 
