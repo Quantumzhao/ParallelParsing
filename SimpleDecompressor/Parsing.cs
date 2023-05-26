@@ -17,9 +17,9 @@ public static class Parsing
 		for (int i = 0; !raw.IsAtEnd; i++)
 		{
 			// emtry space
-			if (raw.Peek() == '\0')
+			if (raw.Peek() == 0)
 			{
-				return ret;
+				yield break;
 			}
 
 			// skip @
@@ -27,26 +27,25 @@ public static class Parsing
 			id = ParseLine(raw);
 			seq = ParseLine(raw);
 			// skip +
-			if (raw.Dequeue() != '+') throw new Exception();
+			var b = raw.Dequeue();
+			if (b != '+') throw new Exception();
 			other = ParseLine(raw);
 			quality = ParseLine(raw);
 
-			ret.Add(new FastqRecord(id, seq, other, quality));
+			yield return new FastqRecord(id, seq, other, quality);
 		}
-
-		return ret;
 	}
 	private static string ParseLine(BigQueue<byte> raw)
 	{
 		var sb = new StringBuilder();
 
-		while (!IsNewLine(raw.Peek()))
+		while (!raw.IsAtEnd && !IsNewLine(raw.Peek()))
 		{
 			sb.Append((char)raw.Dequeue());
 		}
 
 		// consume \n
-		raw.Dequeue();
+		if (!raw.IsAtEnd) raw.Dequeue();
 		return sb.ToString();
 	}
 

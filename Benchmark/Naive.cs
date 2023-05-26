@@ -17,14 +17,14 @@ public class Naive
 	[IterationSetup]
 	public void Setup()
 	{
-		CompressedFileStream = File.OpenRead("./Samples/SRR24554569_575.fastq.gz");
+		CompressedFileStream = File.OpenRead("./Samples/100_SRR24652360.fastq.gz");
 	}
 
 	[Benchmark]
 	public void Run()
 	{
 		if (CompressedFileStream == null) throw new NullReferenceException();
-		SimpleDecompressor.GetAllRecords(CompressedFileStream);
+		Console.WriteLine(SimpleDecompressor.GetAllRecords(CompressedFileStream).Count());
 	}
 
 	[IterationCleanup]

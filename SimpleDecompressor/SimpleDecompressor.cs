@@ -15,13 +15,16 @@ public static class SimpleDecompressor
 	private static IEnumerable<byte[]> DecompressFile(FileStream compressedFileStream)
     {
         using var decompressor = new GZipStream(compressedFileStream, CompressionMode.Decompress);
-		var ret = new List<byte[]>();
 		var res = 0;
-		while (res != 0 && res < int.MaxValue)
+		const int len = 65536;
+		do
 		{
-			var buffer = new byte[int.MaxValue];
-			res = decompressor.Read(buffer, 0, int.MaxValue);
+			var buffer = new byte[len];
+			res = decompressor.Read(buffer, 0, len);
 			yield return buffer;
 		}
+		while (res > 0);
+
+		Console.WriteLine("end");
     }
 }

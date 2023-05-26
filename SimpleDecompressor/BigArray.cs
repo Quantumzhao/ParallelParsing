@@ -6,7 +6,7 @@ public class BigQueue<T> where T : struct
 	public BigQueue(IEnumerable<T[]> ts)
 	{
 		_Enumerator = ts.GetEnumerator();
-		_Enumerator.MoveNext();
+		var res = _Enumerator.MoveNext();
 		_CurrentArray = _Enumerator.Current;
 	}
 	private IEnumerator<T[]> _Enumerator;
@@ -15,23 +15,22 @@ public class BigQueue<T> where T : struct
 
 	public bool TryDequeue(out T t)
 	{
-		if (_CurrentIndex < _CurrentArray.Length)
+		if (_CurrentIndex == _CurrentArray.Length)
 		{
-			t = _CurrentArray[_CurrentIndex];
-			_CurrentIndex++;
-			return true;
+			t = default;
+			return false;
 		}
 
-		if (_Enumerator.MoveNext())
+		t = _CurrentArray[_CurrentIndex];
+		_CurrentIndex++;
+
+		if (_CurrentIndex == _CurrentArray.Length && _Enumerator.MoveNext())
 		{
 			_CurrentArray = _Enumerator.Current;
 			_CurrentIndex = 0;
-			t = _CurrentArray[_CurrentIndex];
-			return true;
 		}
 
-		t = default;
-		return false;
+		return true;
 	}
 
 	public T Peek() => _CurrentArray[_CurrentIndex];
