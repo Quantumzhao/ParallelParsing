@@ -7,3 +7,4 @@ obj/
 Benchmark/BenchmarkDotNet.Artifacts/*
 **/*.fastq
 **/*.fastq.gz
+**/*.i

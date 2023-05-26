@@ -13,7 +13,7 @@ public class FileCompressionModeExample
     {
         // var summary = BenchmarkRunner.Run<SimpleDecompressor>();
 
-        var instance = new SimpleDecompressor();
+        var instance = new Naive();
         instance.Setup();
         instance.Run();
         instance.Cleanup();
