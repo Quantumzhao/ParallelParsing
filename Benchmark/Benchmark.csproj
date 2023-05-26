@@ -3,6 +3,8 @@
   <ItemGroup>
     <ProjectReference Include="../ZRan.NET/ZRan.NET.csproj" />
     <ProjectReference Include="../Decompressor/Decompressor.csproj" />
+    <ProjectReference Include="..\SimpleDecompressor\SimpleDecompressor.csproj" />
+    <ProjectReference Include="..\Common\Common.csproj" />
   </ItemGroup>
 
   <ItemGroup>
