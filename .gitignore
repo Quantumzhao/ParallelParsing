@@ -5,6 +5,7 @@ obj/
 .vscode/
 .fake
 Benchmark/BenchmarkDotNet.Artifacts/*
+Benchmark/Samples/*
 **/*.fastq
 **/*.fastq.gz
 **/*.i

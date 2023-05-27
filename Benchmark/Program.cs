@@ -11,9 +11,10 @@ public class FileCompressionModeExample
 
     public static void Main()
     {
-        // var summary = BenchmarkRunner.Run<SimpleDecompressor>();
+        // var summary = BenchmarkRunner.Run<Naive>();
 
         var instance = new Naive();
+        instance.GzipPath = "65_SRR24651321.fastq.gz";
         instance.Setup();
         instance.Run();
         instance.Cleanup();
