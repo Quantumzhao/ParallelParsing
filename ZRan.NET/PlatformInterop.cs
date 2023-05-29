@@ -70,7 +70,6 @@ internal unsafe struct z_stream
 	/// </summary>
 	public ulong total_out;
 
-#region UNUSED
 	[MarshalAs(UnmanagedType.LPStr)]
 	public IntPtr msg;
 	public void* state;
@@ -80,5 +79,4 @@ internal unsafe struct z_stream
 	public int data_type;
 	public ulong adler;
 	public ulong reserved;
-#endregion
 }

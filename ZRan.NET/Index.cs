@@ -38,6 +38,19 @@ public sealed class Index
 		this.List.Add(next);
 	}
 
+	public void AddPoint_NEW(int bits, long input, long output, uint left, byte[] window, byte[] offset)
+	{
+		Point next = new Point(output, input, bits);
+		next.offset = offset;
+
+		if (left != 0)
+			Array.Copy(window, WINSIZE - left, next.Window, 0, left);
+			
+		if (left < WINSIZE)
+			Array.Copy(window, 0, next.Window, left, WINSIZE - left);
+		this.List.Add(next);
+	}
+
 	public void AddPoint_OLD(int bits, long input, long output, uint left, byte[] window)
 	{
 		Point next = new Point(output, input, bits);
@@ -55,14 +68,17 @@ public sealed class Point
 {
 	// corresponding offset in uncompressed data
 	public readonly long Output;
+
 	// offset in input file of first full byte
-	// public readonly long Input;
-	public  long Input;
+	public readonly long Input;
+
 	// number of bits (1-7) from byte at in-1, or 0
-	// public readonly int Bits;
-	public int Bits;
+	public readonly int Bits;
+
 	// preceding 32K of uncompressed data
 	public readonly byte[] Window;
+
+	public byte[] offset;
 
 	public Point(long output, long input, int bits)
 	{

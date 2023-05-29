@@ -14,12 +14,26 @@ using SDebug = System.Diagnostics.Debug;
 // var testFile = "../Gzipped_FASTQ_Files/SRR11192680.fastq.gz";
 var testFile = "../Gzipped_FASTQ_Files/SRR11192680_original.fastq.gz";
 var fs = File.OpenRead(testFile);
-// var index = Core.BuildDeflateIndex_OLD(fs, span: 1048576L);
-var index = Core.BuildDeflateIndex(fs, chunksize: 2000);
+var index = Core.BuildDeflateIndex_NEW(fs, span: 32768, 2400); //1048576L
+// var index = Core.BuildDeflateIndex_OLD(fs, span: 32768); //1048576L
+// var index = Core.BuildDeflateIndex(fs, chunksize: 1200);
 // i.Serialize("../Gzipped_FASTQ_Files/test1.fastq.gzi");
 
+//-----------------------------------------------------------------------------------------------------------
+// int x = 1;
 
-// for (int x = 0; x < index.List.Count - 1; x++)
+// fs.Position = 0;
+// var from = index.List[x];
+// var to = index.List[x + 1];
+// var outBuf = new byte[2_000_000]; // change size *****************************************
+// Core.ExtractDeflateIndex_OLD(fs, index, from.Output, outBuf, (int)(to.Output - from.Output));
+// outBuf.PrintASCII(2000000);
+
+
+
+
+//-----------------------------------------------------------------------------------------------------------
+// for (int x = 1; x < index.List.Count - 1; x++)
 // {
 // 	fs.Position = 0;
 // 	var len_in = index.List[x+1].Input - index.List[x].Input;
@@ -27,21 +41,111 @@ var index = Core.BuildDeflateIndex(fs, chunksize: 2000);
 // 	var to = index.List[x + 1];
 // 	var len_out = (int)(to.Output - from.Output);
 // 	var fileBuffer = new byte[len_in];
-// 	var outBuf = new byte[2_000_000]; // change size *****************************************
-// 	Core.ExtractDeflateIndex_OLD(fs, index, from.Output, outBuf, len_out);
-//     outBuf.PrintASCII(2000000);
+// 	var outBuf = new byte[len_out]; // change size *****************************************
+// 	Core.ExtractDeflateIndex(fs, index, from.Output, outBuf, len_out);
+//     // outBuf.PrintASCIIFirstAndLast(1500);
+
+
+//     index.List[x].offset.PrintASCII(index.List[x].offset.Length);
+//     // Console.WriteLine("--------------------");
+//     outBuf.PrintASCII(1000);
+//     // Console.WriteLine("||||||||||||||||||||");
 // }
 
-// index.List[2].Input--;
-// index.List[1].Bits = 6;
 
-int x = 1;
-fs.Position = 0;
-var from = index.List[x];
-var to = index.List[x + 1];
-var outBuf = new byte[2_000_000]; // change size *****************************************
-Core.ExtractDeflateIndex(fs, index, from.Output, outBuf, (int)(to.Output - from.Output));
-outBuf.PrintASCII(2000000);
+//-----------------------------------------------------------------------------------------------------------
+// int x = 1;
+
+// // index.List[1].Input --;
+// // index.List[1].Output = 100555;
+// // index.List[1].Bits = 2;
+// // var uncompressedFile = "../Gzipped_FASTQ_Files/SRR11192680.fastq";
+// // var uncompressedFS = File.OpenRead(uncompressedFile);
+// // uncompressedFS.Position = 100555 - 32768;
+// // var newWindow = new byte[32768];
+// // uncompressedFS.ReadExactly(newWindow, 0, 32768);
+// // index.List[1].Window = newWindow;
+
+// // newWindow.PrintASCII(32768);
+
+// fs.Position = 0;
+// var from = index.List[x];
+// var to = index.List[x + 1];
+// var outBuf = new byte[2_000_000]; // change size *****************************************
+// Core.ExtractDeflateIndex_OLD(fs, index, from.Output, outBuf, (int)(to.Output - from.Output));
+// outBuf.PrintASCII(2000000);
+
+//-----------------------------------------------------------------------------------------------------------
+// Test if changing input offset or bits can solve the issue
+
+// int x = 1;
+
+// var originalInputValue = index.List[1].Input;
+
+
+// var uncompressedFile = "../Gzipped_FASTQ_Files/SRR11192680.fastq";
+// var uncompressedFS = File.OpenRead(uncompressedFile);
+// // uncompressedFS.Position = index.List[1].Output - 32768;
+// // var newWindow = new byte[32768];
+// // uncompressedFS.ReadExactly(newWindow, 0, 32768);
+// // newWindow.PrintASCII(32768);
+
+// // index.List[1].Window.PrintASCII(32768);
+
+// for (int inputOffset = -2000; inputOffset < 2000; inputOffset++)
+// {
+//     for (int bits = 0; bits < 8; bits++)
+//     {
+//         // for (int windowOffset = -100; windowOffset < 100; windowOffset++)
+//         // {
+//             index.List[x].Input = originalInputValue + inputOffset;
+//             index.List[x].Bits = bits;
+
+//             // uncompressedFS.Position = index.List[1].Output - 32768 + windowOffset;
+//             // var newWindow = new byte[32768];
+//             // uncompressedFS.ReadExactly(newWindow, 0, 32768);
+//             // index.List[x].Window = newWindow;
+//             // uncompressedFS.Position = 0;
+
+//             fs.Position = 0;
+//             var from = index.List[x];
+//             var to = index.List[x + 1];
+//             var outBuf = new byte[2_000_000]; 
+            
+//             try
+//             {
+//                 var returnValue = Core.ExtractDeflateIndex(fs, index, from.Output, outBuf, (int)(to.Output - from.Output));
+                
+//                 if (returnValue != -3)
+//                 {                
+//                     Console.WriteLine("input offset: " + inputOffset + ", bits: " + bits + 
+//                     // ", windowOffset: " + windowOffset + 
+//                     ", return value: " + (int)returnValue);
+//                     // outBuf.PrintASCII(1000);
+//                 }
+//             }
+//             catch (Exception e)
+//             {
+//                 // Console.WriteLine("!!!!!!!!!!!!!!!!!!!!!!");
+//             }
+//         // }
+//     }
+// }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 int xx = 0;
 
