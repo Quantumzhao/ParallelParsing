@@ -414,7 +414,7 @@ public static class Core
 			// our own total counters to avoid 4GB limit
 			long totin, totout;
 			// totout value of last access point
-			long last;
+			// long last;
 
 			// automatic gzip decoding
 			ret = InflateInit(strm, 47);
@@ -426,7 +426,7 @@ public static class Core
 			// inflate the input, maintain a sliding window, and build an index -- this
 			// also validates the integrity of the compressed data using the check
 			// information in the gzip or zlib stream
-			totin = totout = last = 0;
+			totin = totout = 0;
 			strm.AvailOut = 0;
 			do
 			{
@@ -458,20 +458,8 @@ public static class Core
 					totin += strm.AvailIn;
 					totout += strm.AvailOut;
 
-					//-------------------------------------------------------
 					// return at end of block
 					ret = Inflate(strm, ZFlush.BLOCK);
-
-					// if (strm.DataType == 128 && index.List.Count == 0)
-					// 	index.AddPoint_OLD(strm.DataType & 7, (long)strm.TotalIn, (long)strm.TotalOut, strm.AvailOut, window);
-					// if (strm.TotalIn > 16374)
-					// 	strm.NextOut.PrintASCII(32);
-
-
-
-
-
-
 
 					totin -= strm.AvailIn;
 					totout -= strm.AvailOut;
@@ -479,27 +467,12 @@ public static class Core
 						ret == ZResult.MEM_ERROR ||
 						ret == ZResult.DATA_ERROR)
 						throw new ZException(ret);
-					if (ret == ZResult.STREAM_END)
-					{
-						if (strm.AvailIn != 0 || file.Position != file.Length)
-						{
-							ret = InflateReset(strm);
-							if (ret != ZResult.OK)
-								throw new ZException(ret);
-							continue;
-						}
-						break;
-					}
-
+					
 
 					//------------------------------------------------------
 					// Count how many "@"s are in NextIn
-					// if (totout > 0 ) {
 					int currNextOutLength = strm.NextOut.Length;
 					int iStartPos = prevAvailOut == 0 ? 0 : currNextOutLength - prevAvailOut;
-
-
-
 
 					for (int i = iStartPos; i < currNextOutLength - strm.AvailOut; i++)
 					{
@@ -509,16 +482,13 @@ public static class Core
 						{
 							recordCounter++;
 							Array.Clear(offsetBeforePoint, 0, offsetBeforePoint.Length);
-
 							offsetArraySize = 0;
 						}
 
 						offsetBeforePoint[offsetArraySize] = c;
 						offsetArraySize++;
 					}
-					// }
 					prevAvailOut = strm.AvailOut > 0 ? (int)strm.AvailOut : 0;
-
 
 					// if at end of block, consider adding an index entry (note that if
 					// data_type indicates an end-of-block, then all of the
@@ -530,10 +500,11 @@ public static class Core
 					// access point after the last block by checking bit 6 of data_type
 					if ((strm.DataType & 128) != 0 && (strm.DataType & 64) == 0)
 					{
-						if (totout == 0)
+						// Add the first point after the header
+						if (totout == 0) 
 						{
-							index.AddPoint_OLD(strm.DataType & 7, totin, totout, strm.AvailOut, window);
-							last = totout;
+							index.AddPoint_NEW(strm.DataType & 7, totin, totout, strm.AvailOut, window, null);
+							// last = totout;
 						}
 						else
 						{
@@ -544,15 +515,28 @@ public static class Core
 
 								index.AddPoint_NEW(strm.DataType & 7, totin, totout, strm.AvailOut, window, offsetBeforePoint);
 								Array.Resize(ref offsetBeforePoint, (int)WINSIZE);
-								last = totout;
+								// last = totout;
 								recordCounter = 0;
 							}
+						}
+					}
 
+
+					if (ret == ZResult.STREAM_END)
+					{
+						if (strm.AvailIn != 0 || file.Position != file.Length)
+						{
+							ret = InflateReset(strm);
+							if (ret != ZResult.OK)
+								throw new ZException(ret);
+							continue;
 						}
 
+						index.AddPoint_NEW(strm.DataType & 7, totin, totout, strm.AvailOut, window, null);
 
-
+						break;
 					}
+
 				} while (strm.AvailIn != 0);
 			} while (ret != ZResult.STREAM_END);
 
