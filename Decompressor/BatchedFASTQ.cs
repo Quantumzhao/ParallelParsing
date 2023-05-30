@@ -41,7 +41,6 @@ class BatchedFASTQ : IEnumerable<FastqRecord>, IDisposable
 			_Current = default;
 			_Tasks = new(index.List.Count);
 		}
-		// ~ 500 MB to 1 GB
 		public const int RECORD_CACHE_MAX_LENGTH = 40000;
 		public ArrayPool<byte> BufferPool;
 		public ConcurrentQueue<FastqRecord> RecordCache;

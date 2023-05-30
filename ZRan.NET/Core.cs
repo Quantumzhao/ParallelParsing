@@ -1061,159 +1061,61 @@ public static class Core
 		}
 	}
 
-	public static int ExtractDeflateIndex( // works with old build index
-		FileStream file, Index index, long offset, byte[] buf, int len)
+	public static int ExtractDeflateIndex(
+		byte[] fileBuffer, Point from, Point to, byte[] buf)
 	{
 		// no need to pin (I guess); it's an unmanaged struct on stack
 		using var strm = new ZStream();
 		byte[] input = new byte[CHUNK];
-		byte[] discard = new byte[WINSIZE];
+		var len = (int)(to.Output - from.Output);
 
 		ZResult ret;
 		int value = 0;
-		bool skip;
-		Point here;
-		var streamOffset = 0;
 
 		// proceed only if something reasonable to do
 		if (len < 0)
 			return 0;
 
-		// find where in stream to start
-		value = index.List.Count;
-		while (--value != 0 && index.List[streamOffset + 1].Output <= offset)
-			streamOffset++;
-		here = index.List[streamOffset];
-
 		// raw inflate
 		ret = InflateInit(strm, -15);
 		if (ret != ZResult.OK)
 			throw new ZException(ret);
-		file.Seek(here.Input - (here.Bits != 0 ? 1 : 0), SeekOrigin.Begin);
-		if (here.Bits != 0)
+		var posInFile = from.Bits == 0 ? 1 : 0;
+		if (from.Bits != 0)
 		{
-			value = file.ReadByte();
-			if (value == -1)
-			{
-				throw new ZException(ZResult.DATA_ERROR);
-			}
-			InflatePrime(strm, here.Bits, value >> (8 - here.Bits));
+			value = fileBuffer[0];
+			InflatePrime(strm, from.Bits, value >> (8 - from.Bits));
+			posInFile++;
 		}
-		InflateSetDictionary(strm, here.Window, WINSIZE);
+		InflateSetDictionary(strm, from.Window, WINSIZE);
 
-		// skip uncompressed bytes until offset reached, then satisfy request
-		offset -= here.Output;
 		strm.AvailIn = 0;
-		// while skipping to offset
-		skip = true;
+		// at offset now
+		strm.AvailOut = (uint)len;
+		strm.NextOut = buf;
+
+		// uncompress until avail_out filled, or end of stream
 		do
 		{
-			// define where to put uncompressed data, and how much
-			if (offset > WINSIZE)
+			if (strm.AvailIn == 0)
 			{
-				// skip WINSIZE bytes
-				strm.AvailOut = WINSIZE;
-				strm.NextOut = discard;
-				offset -= WINSIZE;
+				value = TryCopy(fileBuffer, posInFile, input, (int)CHUNK);
+				strm.AvailIn = (uint)value;
+				posInFile += value;
+				if (value == 0) throw new ZException(ZResult.DATA_ERROR);
+				strm.NextIn = input;
 			}
-			else if (offset > 0)
-			{   // last skip
-				strm.AvailOut = (uint)offset;
-				strm.NextOut = discard;
-				offset = 0;
-			}
-			else if (skip)
-			{
-				// at offset now
-				strm.AvailOut = (uint)len;
-				strm.NextOut = buf;
-				// only do this once
-				skip = false;
-			}
+			ret = Inflate(strm, ZFlush.NO_FLUSH);
+			// strm.NextOut.PrintASCII(32*1024-1);
+			// normal inflate
+			if (ret == ZResult.MEM_ERROR || ret == ZResult.DATA_ERROR || ret == ZResult.NEED_DICT)
+				throw new ZException(ret);
+			if (ret == ZResult.STREAM_END) break;
 
-			// uncompress until avail_out filled, or end of stream
-			do
-			{
-				if (strm.AvailIn == 0)
-				{
-					strm.AvailIn = (uint)file.Read(input, 0, (int)CHUNK);
-					if (strm.AvailIn == 0)
-					{
-						throw new ZException(ZResult.DATA_ERROR);
-					}
-					strm.NextIn = input;
-				}
-				ret = Inflate(strm, ZFlush.NO_FLUSH);
-				// strm.NextOut.PrintASCII(32*1024-1);
-				// normal inflate
-				if (ret == ZResult.MEM_ERROR || ret == ZResult.DATA_ERROR || ret == ZResult.NEED_DICT)
-					throw new ZException(ret);
-				if (ret == ZResult.STREAM_END)
-				{
-					// near the end of a gzip member, which might be followed by
-					// another gzip member -- skip the gzip trailer and see if
-					// there is more input after it
-					if (strm.AvailIn < 8)
-					{
-						file.Seek(8 - strm.AvailIn, SeekOrigin.Current);
-						strm.AvailIn = 0;
-					}
-
-					if (strm.AvailIn == 0 && file.Position == file.Length)
-						// the input ended after the gzip trailer -- done
-						break;
-
-					// there is more input, so another gzip member should follow --
-					// validate and skip the gzip header
-					ret = InflateReset(strm, 31);
-					if (ret != ZResult.OK)
-						throw new ZException(ret);
-					do
-					{
-						if (strm.AvailIn == 0)
-						{
-							strm.AvailIn = (uint)file.Read(input, 0, (int)CHUNK);
-							// if (ferror(@in) != 0)
-							// {
-							// 	ret = ZResult.ERRNO;
-							// 	throw new ZException(ZResult.ERRNO);
-							// }
-							if (strm.AvailIn == 0)
-							{
-								ret = ZResult.DATA_ERROR;
-								throw new ZException(ZResult.DATA_ERROR);
-							}
-							strm.NextIn = input;
-						}
-						ret = Inflate(strm, ZFlush.BLOCK);
-						if (ret == ZResult.MEM_ERROR || ret == ZResult.DATA_ERROR)
-						{
-							InflateEnd(strm);
-							return value;
-						}
-					} while ((strm.DataType & 128) == 0);
-
-					// set up to continue decompression of the raw deflate stream
-					// that follows the gzip header
-					ret = InflateReset(strm, -15);
-					if (ret != ZResult.OK)
-						throw new ZException(ret);
-				}
-
-				// continue to process the available input before reading more
-			} while (strm.AvailOut != 0);
-
-			if (ret == ZResult.STREAM_END)
-				// reached the end of the compressed data -- return the data that
-				// was available, possibly less than requested
-				break;
-
-			// do until offset reached and requested data read
-		} while (skip);
+			// continue to process the available input before reading more
+		} while (strm.AvailOut != 0);
 
 		// compute the number of uncompressed bytes read after the offset
-		value = skip ? 0 : len - (int)strm.AvailOut;
-
-		return value;
+		return len - (int)strm.AvailOut;
 	}
 }
