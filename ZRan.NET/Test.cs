@@ -33,24 +33,24 @@ var index = Core.BuildDeflateIndex_NEW(fs, span: 32768, 2400); //1048576L
 
 
 //-----------------------------------------------------------------------------------------------------------
-// for (int x = 1; x < index.List.Count - 1; x++)
-// {
-// 	fs.Position = 0;
-// 	var len_in = index.List[x+1].Input - index.List[x].Input;
-// 	var from = index.List[x];
-// 	var to = index.List[x + 1];
-// 	var len_out = (int)(to.Output - from.Output);
-// 	var fileBuffer = new byte[len_in];
-// 	var outBuf = new byte[len_out]; // change size *****************************************
-// 	Core.ExtractDeflateIndex(fs, index, from.Output, outBuf, len_out);
-//     // outBuf.PrintASCIIFirstAndLast(1500);
+for (int x = 1; x < index.List.Count - 1; x++)
+{
+	fs.Position = 0;
+	var len_in = index.List[x+1].Input - index.List[x].Input;
+	var from = index.List[x];
+	var to = index.List[x + 1];
+	var len_out = (int)(to.Output - from.Output);
+	var fileBuffer = new byte[len_in];
+	var outBuf = new byte[len_out]; // change size *****************************************
+	Core.ExtractDeflateIndex(fs, index, from.Output, outBuf, len_out);
+    // outBuf.PrintASCIIFirstAndLast(1500);
 
 
-//     index.List[x].offset.PrintASCII(index.List[x].offset.Length);
-//     // Console.WriteLine("--------------------");
-//     outBuf.PrintASCII(1000);
-//     // Console.WriteLine("||||||||||||||||||||");
-// }
+    index.List[x].offset.PrintASCII(index.List[x].offset.Length);
+    Console.WriteLine("--------------------");
+    outBuf.PrintASCII(1000);
+    Console.WriteLine("||||||||||||||||||||");
+}
 
 
 //-----------------------------------------------------------------------------------------------------------

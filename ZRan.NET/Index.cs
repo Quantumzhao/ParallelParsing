@@ -40,6 +40,19 @@ public sealed class Index
 
 	public void AddPoint_NEW(int bits, long input, long output, uint left, byte[] window, byte[] offset)
 	{
+
+		if (this.List.Count == 0)
+		{
+			this.ChunkMaxBytes = (int)output;
+		}
+		else 
+		{
+			int outputSize = (int)output - (int)this.List[this.List.Count - 1].Output;
+
+			if (outputSize > this.ChunkMaxBytes)
+				this.ChunkMaxBytes = outputSize;
+		}
+		
 		Point next = new Point(output, input, bits);
 		next.offset = offset;
 
