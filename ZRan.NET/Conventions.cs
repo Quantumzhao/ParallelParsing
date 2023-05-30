@@ -52,17 +52,11 @@ public class ZException : Exception
 	}
 }
 
-public unsafe class ZStream
+public unsafe class ZStream : IDisposable
 {
 	internal ZStream() 
 	{ 
 		Value = new();
-	}
-
-	~ZStream()
-	{
-		if (_HNextIn != default) _HNextIn.Free();
-		if (_HNextOut != default) _HNextOut.Free();
 	}
 
 	[FixedAddressValueType]
@@ -140,6 +134,13 @@ public unsafe class ZStream
 			_NextOut = value;
 			Value.next_out = (byte*)_HNextOut.AddrOfPinnedObject();
 		}
+	}
+
+	public void Dispose()
+	{
+		Compat.InflateEnd(this);
+		if (_HNextOut != default) _HNextOut.Free();
+		if (_HNextIn != default) _HNextIn.Free();
 	}
 }
 
