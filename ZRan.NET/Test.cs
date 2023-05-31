@@ -31,7 +31,7 @@ var index = Core.BuildDeflateIndex_NEW(fs, span: 32768, 2400); //1048576L
 // outBuf.PrintASCIIFirstAndLast(400);
 
 
-// var x = 3;
+// var x = 0;
 // var len_in = index.List[x + 1].Input - index.List[x].Input + 1;
 // var from = index.List[x];
 // var to = index.List[x + 1];
@@ -54,7 +54,7 @@ for (int x = 0; x < index.List.Count - 1; x++)
 	var outBuf = new byte[len_out]; // change size *****************************************
 	Core.ExtractDeflateIndex(fileBuffer, from, to, outBuf);
 	// Core.ExtractDeflateIndex_OLD(fs, index, from.Output, outBuf, len_out);
-    outBuf.PrintASCIIFirstAndLast(1500);
+    // outBuf.PrintASCIIFirstAndLast(1500);
 
 
     // index.List[x].offset.PrintASCII(index.List[x].offset.Length);

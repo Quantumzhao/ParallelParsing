@@ -58,7 +58,7 @@ class BatchedFASTQ : IEnumerable<FastqRecord>, IDisposable
 			// Console.WriteLine(counter);
 		}
 
-// public int counter;
+static object o = new object();
 		public bool MoveNext()
 		{
 			// if (RecordCache.Count == 0) Console.WriteLine(RecordCache.Count);
@@ -66,33 +66,40 @@ class BatchedFASTQ : IEnumerable<FastqRecord>, IDisposable
 				_Reader.TryGetNewPartition(out var entry))
 			{
 				var populateCache = Task.Run(() => {
+					IReadOnlyList<FastqRecord> rs;
 					(var from, var to, var inBuf) = entry;
-					var buf = BufferPool.Rent(_Index.ChunkMaxBytes);
-					Debug.ExtractDummyRange(inBuf, from, to, buf);
-					var rs = Parsing.Parse(buf);
+					// var buf = BufferPool.Rent(_Index.ChunkMaxBytes);
+					var buf = new byte[8_000_000];
+					lock (o)
+					{
+					Core.ExtractDeflateIndex(inBuf, from, to, buf);
+					}
+					lock (o) {
+					// } 
+					// lock (o) 
+					// {
+					rs = Parsing.Parse(new CombinedMemory(from.offset, buf));
 					// counter++;
 					// Console.WriteLine(FastqRecord.counter);
 					// if (rs.Count != 10000) Console.WriteLine(rs.Count);
-					Array.Clear(buf);
-					Array.Clear(inBuf);
-					BufferPool.Return(buf);
-					BufferPool.Return(inBuf);
-					var prev = RecordCache.Count;
-					Parallel.ForEach(rs, (r, _) => RecordCache.Enqueue(r));
+					// Array.Clear(buf);
+					// Array.Clear(inBuf);
+					// BufferPool.Return(buf);
+					// BufferPool.Return(inBuf);
+					}
+					foreach (var r in rs) RecordCache.Enqueue(r);
 				});
 				_Tasks.Add(populateCache);
 			}
 
 			if (RecordCache.TryDequeue(out var res))
 			{
-				// Console.WriteLine("consumed");
 				_Current = res;
 				return true;
 			}
 			else
 			{
 				Task.WaitAll(_Tasks.ToArray());
-				// counter++;
 				if (RecordCache.TryDequeue(out res))
 				{
 					_Current = res;

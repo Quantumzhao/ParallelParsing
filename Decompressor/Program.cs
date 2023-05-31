@@ -20,18 +20,17 @@ public class Program
     public static int readByteSize = 64;
     static void Main(string[] args)
     {
-        var gzipPath575 = "./../Gzipped_FASTQ_Files/SRR24554569_575.fastq";
-        var indexPath575 = "./../Gzipped_FASTQ_Files/SRR24554569_575.fastq.i";
-        var gzipPath32 = "./../Gzipped_FASTQ_Files/SRR24496856_32.fastq";
-        var indexPath32 = "./../Gzipped_FASTQ_Files/SRR24496856_32.fastq.i";
+        var gzipPath = "./../Gzipped_FASTQ_Files/SRR11192680_original.fastq.gz";
+        // var gzipPath575 = "./../Gzipped_FASTQ_Files/SRR24554569_575.fastq";
+        // var indexPath575 = "./../Gzipped_FASTQ_Files/SRR24554569_575.fastq.i";
+        // var gzipPath32 = "./../Gzipped_FASTQ_Files/SRR24496856_32.fastq";
+        // var indexPath32 = "./../Gzipped_FASTQ_Files/SRR24496856_32.fastq.i";
         // count = 588530
         // As = 37990794
 
-        // var fs = File.OpenRead(gzipPath);
-        // var index = Debug.BuildDummyIndex(fs, 10000);
-        // index.Serialize("./../Gzipped_FASTQ_Files/SRR24554569_575.fastq.i");
-        // Console.WriteLine(index.List.Count);
-        // fs.Dispose();
+        var fs = File.OpenRead(gzipPath);
+        var index = Core.BuildDeflateIndex_NEW(fs, 32768, 2400);
+        fs.Dispose();
 
         // fs = File.OpenRead(gzipPath);
         var sw = new Stopwatch();
@@ -50,7 +49,7 @@ public class Program
         // }
         // Console.WriteLine(count);
 
-        using var records = new BatchedFASTQ(indexPath32, gzipPath32, enableSsdOptimization: false);
+        using var records = new BatchedFASTQ(index, gzipPath, enableSsdOptimization: false);
         sw.Start();
         var count = records.Aggregate(0, (a, x) => a + x.Sequence.Count(c => c == 'A'));
         // var count = records.Count();

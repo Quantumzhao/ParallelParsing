@@ -1,5 +1,5 @@
-using System.Threading.Tasks;
 
+using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Collections;
 using ParallelParsing.ZRan.NET;
@@ -21,7 +21,7 @@ public class LazyFileReader : IDisposable
 	private FileStream[] _FileReads;
 	private ArrayPool<byte> _BufferPool;
 	private bool _IsEOF = false;
-	private int _CurrPoint = -1;
+	private int _CurrPoint = 0;
 	// private bool _CanGetNewPartition = true;
 
 	public LazyFileReader(Index index, string path, ArrayPool<byte> pool, bool enableSsdOptimization)
@@ -57,27 +57,23 @@ public class LazyFileReader : IDisposable
 			int len;
 			lock (this)
 			{
-				if (_CurrPoint == -1) from = new Point(0, 0, 0);
-				else from = _Index.List[_CurrPoint];
+				from = _Index.List[_CurrPoint];
 
 				_CurrPoint++;
 				if (_CurrPoint < _Index.List.Count) to = _Index.List[_CurrPoint];
 				else
 				{
 					_IsEOF = true;
-					to = new Point(0, fs.Length, 0);
+					return;
 				}
 
-				len = (int)(to.Input - from.Input);
+				len = (int)(to.Input - from.Input + 1);
 			}
-			buf = _BufferPool.Rent(_Index.ChunkMaxBytes);
+			buf = new byte[len];
 			
-			fs.Position = from.Input;
+			fs.Position = from.Input - 1;
 			fs.ReadExactly(buf, 0, len);
-			lock (PartitionQueue)
-			{
-				PartitionQueue.Enqueue((from, to, buf));
-			}
+			PartitionQueue.Enqueue((from, to, buf));
 		});
 	}
 
@@ -102,19 +98,6 @@ public class LazyFileReader : IDisposable
 			// if (_IsEOF && PartitionQueue.Count == 0) Console.WriteLine("here");
 			return PartitionQueue.TryDequeue(out entry);
 			// int prevCount = PartitionQueue.Count;
-
-			// if (readBytes.Status == TaskStatus.RanToCompletion && PartitionQueue.Count == prevCount)
-			// {
-			// 	return false;
-			// }
-			// else
-			// {
-			// 	// Console.WriteLine("wait read");
-			// 	readBytes.Wait();
-			// 	// if (PartitionQueue.Count == 0) Console.WriteLine("here");
-			// 	_CanGetNewPartition = PartitionQueue.TryDequeue(out entry);
-			// 	return _CanGetNewPartition;
-			// }
 		}
 	}
 }
