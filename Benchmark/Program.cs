@@ -6,18 +6,18 @@ using ParallelParsing;
 
 public class FileCompressionModeExample
 {
-    private const string CompressedFileName = "../Gzipped_FASTQ_Files/SRR11192680.fastq.gz";
-    private const string DecompressedFileName = "decompressed.txt";
+    // private const string CompressedFileName = "../Gzipped_FASTQ_Files/SRR11192680.fastq.gz";
+    // private const string DecompressedFileName = "decompressed.txt";
 
     public static void Main()
     {
-        // var summary = BenchmarkRunner.Run<Naive>();
+        var summary = BenchmarkRunner.Run<Naive>();
 
-        var instance = new Naive();
-        instance.GzipPath = "65_SRR24651321.fastq.gz";
-        instance.Setup();
-        instance.Run();
-        instance.Cleanup();
+        // var instance = new Naive();
+        // instance.GzipPath = "48000.gz";
+        // instance.Setup();
+        // instance.Run();
+        // instance.Cleanup();
 
         // var ms = DecompressFile();
         // var entries = FASTQRecord.Parse(ms.GetBuffer());

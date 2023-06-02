@@ -7,26 +7,28 @@ using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 using ParallelParsing;
 using ParallelParsing.Benchmark.Naive;
+using ParallelParsing.ZRan.NET;
 
-[SimpleJob(RuntimeMoniker.NativeAot70)]
+[SimpleJob(RuntimeMoniker.NativeAot80)]
 public class Naive
 {
 	// [Params(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)]
 	// public int Number;
 
 	[Params(
-		"10_SRR24677526.fastq.gz",
-		"42_SRR24651315.fastq.gz",
-		"65_SRR24651321.fastq.gz", 
-		"100_SRR24652360.fastq.gz",
-		"203_SRR24650904.fastq.gz",
-		"1600_ERR908507_2.fastq.gz",
-		"2400_SRR315307_2.fastq.gz",
-		"3100_SRR23885769.fastq.gz",
-		"3900_SRR317047_1.fastq.gz",
-		"11000_SRR1448791_1.fastq.gz",
-		"21000_SRR534304_1.fastq.gz",
-		"48000_SRR23885771.fastq.gz"
+		"48000.gz",
+		"96000.gz",
+		"192000.gz",
+		"384000.gz",
+		"768000.gz",
+		"1536000.gz",
+		"3072000.gz",
+		"6144000.gz"
+		// "12288000.gz",
+		// "24576000.gz",
+		// "49152000.gz",
+		// "98304000.gz",
+		// "196608000.gz"
 	)]
 	public string GzipPath;
 
@@ -42,7 +44,8 @@ public class Naive
 	public void Run()
 	{
 		if (CompressedFileStream == null) throw new NullReferenceException();
-		Console.WriteLine(SimpleDecompressor.GetAllRecords(CompressedFileStream).Count());
+		var index = Core.BuildDeflateIndex_NEW(CompressedFileStream, span: 32768, 2400); 
+		// Console.WriteLine(SimpleDecompressor.GetAllRecords(CompressedFileStream).Count());
 	}
 
 	[IterationCleanup]
