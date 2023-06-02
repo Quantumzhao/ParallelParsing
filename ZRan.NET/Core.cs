@@ -432,7 +432,6 @@ public static class Core
 			{
 				// get some compressed data from input file
 				strm.AvailIn = (uint)file.Read(input, 0, (int)CHUNK);
-				// strm.AvailIn = (uint)file.Read(input, 0, 20);
 				// if (ferror(@in) != 0)
 				// {
 				// 	throw new ZException(ZResult.ERRNO);
@@ -465,7 +464,10 @@ public static class Core
 					totout -= strm.AvailOut;
 					if (ret == ZResult.NEED_DICT ||
 						ret == ZResult.MEM_ERROR ||
-						ret == ZResult.DATA_ERROR)
+						ret == ZResult.DATA_ERROR ||
+						ret == ZResult.STREAM_ERROR ||
+						ret == ZResult.BUF_ERROR ||
+						ret == ZResult.VERSION_ERROR)
 						throw new ZException(ret);
 					
 
@@ -510,12 +512,13 @@ public static class Core
 						{
 							if (recordCounter > chunksize * 0.9)
 							{
-								Array.Resize(ref offsetBeforePoint, offsetArraySize);
+								// Array.Resize(ref offsetBeforePoint, offsetArraySize + 1);
 								// offsetBeforePoint.PrintASCII(offsetBeforePoint.Length);
 
-								index.AddPoint_NEW(strm.DataType & 7, totin, totout, strm.AvailOut, window, offsetBeforePoint);
-								Array.Resize(ref offsetBeforePoint, (int)WINSIZE);
-								// last = totout;
+								index.AddPoint_NEW(strm.DataType & 7, totin, totout, strm.AvailOut, window, offsetBeforePoint[0..offsetArraySize]);
+								Console.WriteLine(index.List.Count());
+								
+								// Array.Resize(ref offsetBeforePoint, (int)WINSIZE);
 								recordCounter = 0;
 							}
 						}
@@ -637,6 +640,7 @@ public static class Core
 						(totout == 0 || totout - last > span))
 					{
 						index.AddPoint_OLD(strm.DataType & 7, totin, totout, strm.AvailOut, window);
+						Console.WriteLine(index.List.Count());
 						last = totout;
 					}
 				} while (strm.AvailIn != 0);
