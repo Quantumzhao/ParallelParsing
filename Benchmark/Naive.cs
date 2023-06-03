@@ -46,7 +46,7 @@ public class Naive
 	public void Run()
 	{
 		if (CompressedFileStream == null) throw new NullReferenceException();
-		Console.WriteLine(Core.BuildDeflateIndex_NEW(CompressedFileStream, span: 32768, 10000).List.Count()); 
+		Console.WriteLine(Core.BuildDeflateIndex_NEW(CompressedFileStream, 10000).List.Count()); 
 		// Console.WriteLine(SimpleDecompressor.GetAllRecords(CompressedFileStream).Count());
 	}
 

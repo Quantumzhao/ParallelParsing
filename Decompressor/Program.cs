@@ -20,7 +20,8 @@ public class Program
     public static int readByteSize = 64;
     static void Main(string[] args)
     {
-        var gzipPath = "./../Gzipped_FASTQ_Files/SRR11192680_original.fastq.gz";
+        // var gzipPath = "./../Gzipped_FASTQ_Files/SRR11192680_original.fastq.gz";
+        var gzipPath = "./../Benchmark/Samples/384000.gz";
         // var gzipPath575 = "./../Gzipped_FASTQ_Files/SRR24554569_575.fastq";
         // var indexPath575 = "./../Gzipped_FASTQ_Files/SRR24554569_575.fastq.i";
         // var gzipPath32 = "./../Gzipped_FASTQ_Files/SRR24496856_32.fastq";
@@ -29,7 +30,7 @@ public class Program
         // As = 37990794
 
         var fs = File.OpenRead(gzipPath);
-        var index = Core.BuildDeflateIndex_NEW(fs, 32768, 2400);
+        var index = Core.BuildDeflateIndex_NEW(fs, 2400);
         fs.Dispose();
 
         // fs = File.OpenRead(gzipPath);

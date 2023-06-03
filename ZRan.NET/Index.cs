@@ -99,6 +99,7 @@ public sealed class Point
 		this.Input = input;
 		this.Bits = bits;
 		this.Window = new byte[WINSIZE];
+		this.offset = new byte[WINSIZE];
 	}
 
 	internal Point(long output, long input, int bits, byte[] window)

@@ -12,18 +12,18 @@ using SDebug = System.Diagnostics.Debug;
 //Bug: when there are more than 93 points in index, it will stop running
 
 // var testFile = "../Gzipped_FASTQ_Files/SRR11192680_original.fastq.gz";
-var testFile = "../Benchmark//Samples/12288000.gz";
+var testFile = "../Benchmark//Samples/1536000.gz";
 var fs = File.OpenRead(testFile);
-// var index = Core.BuildDeflateIndex_NEW(fs, span: 32768, 200); //1048576L
+var index = Core.BuildDeflateIndex_NEW(fs, 6000); //1048576L
 // var index = Core.BuildDeflateIndex_OLD(fs, span: 32768); //1048576L
 // var index = Core.BuildDeflateIndex(fs, chunksize: 1200);
 // i.Serialize("../Gzipped_FASTQ_Files/test1.fastq.gzi");
 
-Console.WriteLine(Core.BuildDeflateIndex_NEW(fs, span: 32768, 20000).List.Count());
+// Console.WriteLine(Core.BuildDeflateIndex_NEW(fs, span: 32768, 20000).List.Count());
 // chunsize 30,000 works for 12288000.gz
 
 //-----------------------------------------------------------------------------------------------------------
-int x = 37;
+// int x = 37;
 
 // fs.Position = 0;
 // var from = index.List[x];
@@ -64,9 +64,10 @@ int x = 37;
 //     // Console.WriteLine("--------------------");
 //     // outBuf.PrintASCII(1000);
 //     // Console.WriteLine("||||||||||||||||||||");
-// 	Console.WriteLine(x);
+// 	// Console.WriteLine(x);
 // }
 
+// Console.WriteLine(index.List.Count());
 
 //-----------------------------------------------------------------------------------------------------------
 // int x = 1;
