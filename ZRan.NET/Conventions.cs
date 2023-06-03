@@ -55,43 +55,34 @@ public class ZException : Exception
 public unsafe class ZStream : IDisposable
 {
 	internal ZStream() 
-	{ 
-		Value = new();
+	{
+		var stream = new z_stream();
+		Ptr = (z_stream*)NativeMemory.Alloc((nuint)sizeof(z_stream));
+		Marshal.StructureToPtr(stream, (nint)Ptr, false);
 	}
 
-	[FixedAddressValueType]
-	internal z_stream Value;
-	internal z_stream* Ptr
-	{
-		get
-		{
-			fixed (z_stream* p = &Value)
-			{
-				return p;
-			}
-		}
-	}
+	internal z_stream* Ptr { get; init; }
 
 	public ulong TotalIn
 	{
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		get => Value.total_in;
+		get => Ptr->total_in;
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		set => Value.total_in = value;
+		set => Ptr->total_in = value;
 	}
 
 	public ulong TotalOut
 	{
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		get => Value.total_out;
+		get => Ptr->total_out;
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		set => Value.total_out = value;
+		set => Ptr->total_out = value;
 	}
 
 	public int DataType
 	{
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		get => Value.data_type;
+		get => Ptr->data_type;
 	}
 
 	private byte[]? _NextIn;
@@ -99,18 +90,19 @@ public unsafe class ZStream : IDisposable
 	public uint AvailIn 
 	{ 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)] 
-		get => Value.avail_in;
+		get => Ptr->avail_in;
 		[MethodImpl(MethodImplOptions.AggressiveInlining)] 
-		set => Value.avail_in = value;
+		set => Ptr->avail_in = value;
 	}
 	public byte[]? NextIn
 	{
 		get => _NextIn;
 		set
 		{
-			// if (_HNextIn != default) _HNextIn.Free();
-			// _HNextIn = GCHandle.Alloc(value, GCHandleType.Pinned);
+			if (_HNextIn != default) _HNextIn.Free();
+			_HNextIn = GCHandle.Alloc(value, GCHandleType.Pinned);
 			_NextIn = value;
+			Ptr->next_in = (byte*)_HNextIn.AddrOfPinnedObject();
 		}
 	}
 
@@ -119,19 +111,19 @@ public unsafe class ZStream : IDisposable
 	public uint AvailOut
 	{
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		get => Value.avail_out;
+		get => Ptr->avail_out;
 		[MethodImpl(MethodImplOptions.AggressiveInlining)] 
-		set => Value.avail_out = value;
+		set => Ptr->avail_out = value;
 	}
 	public byte[]? NextOut
 	{
 		get => _NextOut;
 		set
 		{
-			// if (_HNextOut != default) _HNextOut.Free();
-			// _HNextOut = GCHandle.Alloc(value, GCHandleType.Pinned);
+			if (_HNextOut != default) _HNextOut.Free();
+			_HNextOut = GCHandle.Alloc(value, GCHandleType.Pinned);
 			_NextOut = value;
-			// Value.next_out = (byte*)_HNextOut.AddrOfPinnedObject();
+			Ptr->next_out = (byte*)_HNextOut.AddrOfPinnedObject();
 		}
 	}
 
@@ -183,17 +175,7 @@ public unsafe static class Compat
 	}
 
 	public static ZResult Inflate(ZStream strm, ZFlush flush)
-	{
-		fixed (byte* pIn = strm.NextIn)
-		{
-			fixed (byte* pOut = strm.NextOut)
-			{
-				strm.Ptr->next_in = pIn;
-				strm.Ptr->next_out = pOut;
-				return inflate(strm.Ptr, flush);
-			}
-		}
-	}
+		=> inflate(strm.Ptr, flush);
 
 	public static ZResult InflateEnd(ZStream strm) => inflateEnd(strm.Ptr);
 

@@ -46,7 +46,7 @@ internal unsafe struct z_stream
 	/// <summary>
 	/// next input byte
 	/// </summary>
-	[MarshalAs(UnmanagedType.LPArray)]
+	// [MarshalAs(UnmanagedType.LPArray)]
 	public byte* next_in;
 	/// <summary>
 	/// number of bytes available at next_in
@@ -59,7 +59,7 @@ internal unsafe struct z_stream
 	/// <summary>
 	/// next output byte will go here
 	/// </summary>
-	[MarshalAs(UnmanagedType.LPArray)]
+	// [MarshalAs(UnmanagedType.LPArray)]
 	public byte* next_out;
 	/// <summary>
 	/// remaining free space at next_out
@@ -70,7 +70,7 @@ internal unsafe struct z_stream
 	/// </summary>
 	public ulong total_out;
 
-	[MarshalAs(UnmanagedType.LPStr)]
+	// [MarshalAs(UnmanagedType.LPStr)]
 	public IntPtr msg;
 	public void* state;
 	public void* zalloc;

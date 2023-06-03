@@ -51,8 +51,8 @@ public class Program
 
         using var records = new BatchedFASTQ(index, gzipPath, enableSsdOptimization: false);
         sw.Start();
-        var count = records.Aggregate(0, (a, x) => a + x.Sequence.Count(c => c == 'A'));
-        // var count = records.Count();
+        // var count = records.Aggregate(0, (a, x) => a + x.Sequence.Count(c => c == 'A'));
+        var count = records.Count();
         sw.Stop();
         Console.WriteLine(count);
         Console.WriteLine("Ellapsed: " + sw.ElapsedMilliseconds);
