@@ -108,10 +108,9 @@ public unsafe class ZStream : IDisposable
 		get => _NextIn;
 		set
 		{
-			if (_HNextIn != default) _HNextIn.Free();
-			_HNextIn = GCHandle.Alloc(value, GCHandleType.Pinned);
+			// if (_HNextIn != default) _HNextIn.Free();
+			// _HNextIn = GCHandle.Alloc(value, GCHandleType.Pinned);
 			_NextIn = value;
-			Value.next_in = (byte*)_HNextIn.AddrOfPinnedObject();
 		}
 	}
 
@@ -129,10 +128,10 @@ public unsafe class ZStream : IDisposable
 		get => _NextOut;
 		set
 		{
-			if (_HNextOut != default) _HNextOut.Free();
-			_HNextOut = GCHandle.Alloc(value, GCHandleType.Pinned);
+			// if (_HNextOut != default) _HNextOut.Free();
+			// _HNextOut = GCHandle.Alloc(value, GCHandleType.Pinned);
 			_NextOut = value;
-			Value.next_out = (byte*)_HNextOut.AddrOfPinnedObject();
+			// Value.next_out = (byte*)_HNextOut.AddrOfPinnedObject();
 		}
 	}
 
@@ -184,7 +183,17 @@ public unsafe static class Compat
 	}
 
 	public static ZResult Inflate(ZStream strm, ZFlush flush)
-		=> inflate(strm.Ptr, flush);
+	{
+		fixed (byte* pIn = strm.NextIn)
+		{
+			fixed (byte* pOut = strm.NextOut)
+			{
+				strm.Ptr->next_in = pIn;
+				strm.Ptr->next_out = pOut;
+				return inflate(strm.Ptr, flush);
+			}
+		}
+	}
 
 	public static ZResult InflateEnd(ZStream strm) => inflateEnd(strm.Ptr);
 

@@ -516,7 +516,7 @@ public static class Core
 								// offsetBeforePoint.PrintASCII(offsetBeforePoint.Length);
 
 								index.AddPoint_NEW(strm.DataType & 7, totin, totout, strm.AvailOut, window, offsetBeforePoint[0..offsetArraySize]);
-								Console.WriteLine(index.List.Count());
+								// Console.WriteLine(index.List.Count());
 								
 								// Array.Resize(ref offsetBeforePoint, (int)WINSIZE);
 								recordCounter = 0;
@@ -877,6 +877,11 @@ static object o = new object();
 			// normal inflate
 			if (ret == ZResult.MEM_ERROR || ret == ZResult.DATA_ERROR || ret == ZResult.NEED_DICT)
 				throw new ZException(ret);
+			if (ret == ZResult.STREAM_ERROR)
+			{
+				Console.WriteLine("stream error");
+				break;
+			}
 			if (ret == ZResult.STREAM_END) break;
 
 			// continue to process the available input before reading more
