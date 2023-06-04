@@ -3,19 +3,18 @@ namespace ParallelParsing.ZRan.NET;
 
 public static class IndexIO
 {
-	// chunksize : uint | chunkMaxBytes : int | count : int | points : [(output : long) 
+	// chunkMaxBytes : int | count : int | points : [(output : long) 
 	// | (input : long) | (bits : int) | (winLen : int) | (win : [byte])]
 	public static void Serialize(this Index index, string path)
 	{
 		using var stream = File.Create(path);
 		using var bw = new BinaryWriter(stream);
 
-		bw.Write(index.ChunkSize);
 		bw.Write(index.ChunkMaxBytes);
 
-		bw.Write(index.List.Count);
+		bw.Write(index.Count);
 
-		for (int i = 0; i < index.List.Count; i++)
+		for (int i = 0; i < index.Count; i++)
 		{
 			bw.Write(index.List[i].Output);
 			bw.Write(index.List[i].Input);
@@ -32,7 +31,6 @@ public static class IndexIO
 		using var stream = File.OpenRead(path);
 		using var br = new BinaryReader(stream);
 
-		var ChunkSize = br.ReadUInt32();
 		var chunkMaxBytes = br.ReadInt32();
 
 		var count = br.ReadInt32();
@@ -50,9 +48,6 @@ public static class IndexIO
 			points[i] = new Point(output, input, bits, window, offset);
 		}
 
-		return new Index(ChunkSize) { 
-			List = new List<Point>(points), 
-			ChunkMaxBytes = chunkMaxBytes 
-		};
+		return new Index(points);
 	}
 }

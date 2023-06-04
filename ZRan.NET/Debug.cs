@@ -33,33 +33,4 @@ public static class Debug
 		Console.Write(System.Text.Encoding.UTF8.GetString(arr).Substring(Math.Max(0, arr.Length - first)));
 		Console.WriteLine();
 	}
-
-	public static Index BuildDummyIndex(FileStream file, uint chunksize)
-	{
-		var index = new Index(chunksize);
-		var chunkBytes = 0;
-		
-		var newLineCounter = 0;
-		while (file.Position != file.Length)
-		{
-			var b = (byte)file.ReadByte();
-			chunkBytes++;
-			if (b == '\n') newLineCounter++;
-
-			if (newLineCounter == 4 * chunksize)
-			{
-				index.AddPoint_OLD(0, file.Position, file.Position, 0, new byte[Constants.WINSIZE]);
-				index.ChunkMaxBytes = Math.Max(chunkBytes, index.ChunkMaxBytes);
-				newLineCounter = 0;
-				chunkBytes = 0;
-			}
-		}
-
-		return index;
-	}
-
-	public static void ExtractDummyRange(byte[] fileBuffer, Point from, Point to, byte[] buf)
-	{
-		Array.Copy(fileBuffer, buf, to.Input - from.Input);
-	}
 }

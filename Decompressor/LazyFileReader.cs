@@ -7,22 +7,24 @@ using Index = ParallelParsing.ZRan.NET.Index;
 using System.Collections.Concurrent;
 using System.Buffers;
 using System.Diagnostics;
+using PrioritySchedulingTools;
 
 namespace ParallelParsing;
 
-public class LazyFileReader : IDisposable
+public sealed class LazyFileReader : IDisposable
 {
-	public const int FILE_THREADS_COUNT_SSD = 4;
+	public const int FILE_THREADS_COUNT_SSD = 8;
 	public const int FILE_THREADS_COUNT_HDD = 1;
 	
-	public readonly ConcurrentQueue<(Point from, Point to, byte[] segment)> PartitionQueue;
+	public readonly ConcurrentQueue<(Point from, Point to, Memory<byte> segment, IMemoryOwner<byte>)> PartitionQueue;
 	private Index _Index;
 	// private IEnumerator<Point> _IndexEnumerator;
-	private FileStream[] _FileReads;
+	private Stream[] _FileReads;
 	private ArrayPool<byte> _BufferPool;
 	private bool _IsEOF = false;
 	private int _CurrPoint = 0;
 	// private bool _CanGetNewPartition = true;
+	// byte[] buf;
 
 	public LazyFileReader(Index index, string path, ArrayPool<byte> pool, bool enableSsdOptimization)
 	{
@@ -30,13 +32,16 @@ public class LazyFileReader : IDisposable
 		PartitionQueue = new();
 		_BufferPool = pool;
 		// _IndexEnumerator = _Index.List.GetEnumerator();
+		// buf = File.ReadAllBytes(path);
+		
 
 		_FileReads = enableSsdOptimization ?
-					   new FileStream[FILE_THREADS_COUNT_SSD] :
-					   new FileStream[FILE_THREADS_COUNT_HDD];
+					   new Stream[FILE_THREADS_COUNT_SSD] :
+					   new Stream[FILE_THREADS_COUNT_HDD];
 		for (int i = 0; i < _FileReads.Length; i++)
 		{
-			_FileReads[i] = File.OpenRead(path);
+			_FileReads[i] = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+			// _FileReads[i] = new MemoryStream(buf);
 		}
 	}
 
@@ -45,22 +50,22 @@ public class LazyFileReader : IDisposable
 		Parallel.ForEach(_FileReads, f => f.Dispose());
 	}
 
-	private void TryReadMore()
+	private int TryReadMore()
 	{
 		Parallel.ForEach(_FileReads, fs => {
 			if (_IsEOF) return;
 
 			Point from;
 			Point to;
-			// bool res;
-			byte[] buf;
+			Memory<byte> buf;
+			IMemoryOwner<byte> bufOwner;
 			int len;
 			lock (this)
 			{
-				from = _Index.List[_CurrPoint];
+				from = _Index[_CurrPoint];
 
 				_CurrPoint++;
-				if (_CurrPoint < _Index.List.Count) to = _Index.List[_CurrPoint];
+				if (_CurrPoint < _Index.Count) to = _Index[_CurrPoint];
 				else
 				{
 					_IsEOF = true;
@@ -69,15 +74,19 @@ public class LazyFileReader : IDisposable
 
 				len = (int)(to.Input - from.Input + 1);
 			}
-			buf = new byte[len];
+			bufOwner = MemoryPool<byte>.Shared.Rent(len);
+			buf = bufOwner.Memory.Slice(0, len);
 			
 			fs.Position = from.Input - 1;
-			fs.ReadExactly(buf, 0, len);
-			PartitionQueue.Enqueue((from, to, buf));
+			fs.Read(buf.Span);
+			PartitionQueue.Enqueue((from, to, buf, bufOwner));
 		});
+
+		
+		return 0;
 	}
 
-	public bool TryGetNewPartition(out (Point from, Point to, byte[] segment) entry)
+	public bool TryGetNewPartition(out (Point from, Point to, Memory<byte> segment, IMemoryOwner<byte>) entry)
 	{
 		if (_IsEOF && PartitionQueue.Count == 0)
 		{
@@ -86,7 +95,7 @@ public class LazyFileReader : IDisposable
 		}
 
 		Task? readBytes = null;
-		if (!_IsEOF && PartitionQueue.Count <= 2) readBytes = Task.Run(TryReadMore);
+		if (!_IsEOF && PartitionQueue.Count <= 32) readBytes = BatchedFASTQ.Scheduler.Run<int>(0, 0, TryReadMore);
 
 		if (PartitionQueue.TryDequeue(out entry))
 		{
@@ -94,7 +103,12 @@ public class LazyFileReader : IDisposable
 		}
 		else
 		{
+			// var sw = new Stopwatch();
+			// sw.Start();
+			// Console.WriteLine("here");
 			readBytes?.Wait();
+			// sw.Stop();
+			// Console.WriteLine(sw.ElapsedMilliseconds);
 			// if (_IsEOF && PartitionQueue.Count == 0) Console.WriteLine("here");
 			return PartitionQueue.TryDequeue(out entry);
 			// int prevCount = PartitionQueue.Count;
