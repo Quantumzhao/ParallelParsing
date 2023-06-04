@@ -12,7 +12,7 @@ public static class Core
 	public static Index BuildDeflateIndex_NEW(FileStream file, uint chunksize)
 	{
 		ZStream strm = new();
-		Index index = new Index(0);
+		Index index = new Index();
 		byte[] input = new byte[CHUNK];
 		byte[] window = new byte[WINSIZE];
 
@@ -109,12 +109,12 @@ public static class Core
 						{
 							// Add the first point after the header
 							if (totout == 0) 
-								index.AddPoint_NEW(strm.DataType & 7, totin, totout, strm.AvailOut, window, new byte[0]);
+								index.AddPoint(strm.DataType & 7, totin, totout, strm.AvailOut, window, new byte[0]);
 							else
 							{
 								if (recordCounter > chunksize - 8)
 								{
-									index.AddPoint_NEW(strm.DataType & 7, totin, totout, strm.AvailOut, window, offsetBeforePoint[0..offsetArraySize]);
+									index.AddPoint(strm.DataType & 7, totin, totout, strm.AvailOut, window, offsetBeforePoint[0..offsetArraySize]);
 									recordCounter = 0;
 								}
 							}
@@ -130,7 +130,7 @@ public static class Core
 								throw new ZException(ret);
 							continue;
 						}
-						index.AddPoint_NEW(strm.DataType & 7, totin, totout, strm.AvailOut, window, new byte[0]);
+						index.AddPoint(strm.DataType & 7, totin, totout, strm.AvailOut, window, new byte[0]);
 						break;
 					}
 
