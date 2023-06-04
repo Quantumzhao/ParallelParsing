@@ -29,12 +29,15 @@ public class Program
         // count = 588530
         // As = 37990794
 
+        var sw = new Stopwatch();
         var fs = File.OpenRead(gzipPath);
-        var index = Core.BuildDeflateIndex_NEW(fs, 2400);
+        sw.Start();
+        var index = Core.BuildDeflateIndex(fs, 2400);
+        sw.Stop();
+        Console.WriteLine("build index elapsed: " + sw.ElapsedMilliseconds);
         fs.Dispose();
 
         // fs = File.OpenRead(gzipPath);
-        var sw = new Stopwatch();
         // var fastq = new BatchedFASTQ(index, gzipPath, false);
         // foreach (var r in fastq)
         // {
@@ -56,7 +59,7 @@ public class Program
         var count = records.Count();
         sw.Stop();
         Console.WriteLine(count);
-        Console.WriteLine("Ellapsed: " + sw.ElapsedMilliseconds);
+        Console.WriteLine("Elapsed: " + sw.ElapsedMilliseconds);
 
         // var bytes = File.ReadAllBytes(gzipPath32);
         // sw.Start();

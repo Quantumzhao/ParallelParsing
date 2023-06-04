@@ -15,7 +15,7 @@ public class LazyFileReader : IDisposable
 	public const int FILE_THREADS_COUNT_SSD = 4;
 	public const int FILE_THREADS_COUNT_HDD = 1;
 	
-	public readonly ConcurrentQueue<(Point from, Point to, byte[] segment)> PartitionQueue;
+	public readonly ConcurrentQueue<(Point from, Point to, Memory<byte> segment, IMemoryOwner<byte>)> PartitionQueue;
 	private Index _Index;
 	// private IEnumerator<Point> _IndexEnumerator;
 	private FileStream[] _FileReads;
@@ -52,8 +52,8 @@ public class LazyFileReader : IDisposable
 
 			Point from;
 			Point to;
-			// bool res;
-			byte[] buf;
+			Memory<byte> buf;
+			IMemoryOwner<byte> bufOwner;
 			int len;
 			lock (this)
 			{
@@ -69,15 +69,16 @@ public class LazyFileReader : IDisposable
 
 				len = (int)(to.Input - from.Input + 1);
 			}
-			buf = new byte[len];
+			bufOwner = MemoryPool<byte>.Shared.Rent(len);
+			buf = bufOwner.Memory.Slice(0, len);
 			
 			fs.Position = from.Input - 1;
-			fs.ReadExactly(buf, 0, len);
-			PartitionQueue.Enqueue((from, to, buf));
+			fs.Read(buf.Span);
+			PartitionQueue.Enqueue((from, to, buf, bufOwner));
 		});
 	}
 
-	public bool TryGetNewPartition(out (Point from, Point to, byte[] segment) entry)
+	public bool TryGetNewPartition(out (Point from, Point to, Memory<byte> segment, IMemoryOwner<byte>) entry)
 	{
 		if (_IsEOF && PartitionQueue.Count == 0)
 		{

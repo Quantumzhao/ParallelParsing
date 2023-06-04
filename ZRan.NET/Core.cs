@@ -4,12 +4,13 @@ using static ParallelParsing.ZRan.NET.Compat;
 using System.IO.Compression;
 using System.Text;
 using System.Runtime.InteropServices;
+using System.Buffers;
 
 namespace ParallelParsing.ZRan.NET;
 
 public static class Core
 {
-	public static Index BuildDeflateIndex_NEW(FileStream file, uint chunksize)
+	public static Index BuildDeflateIndex(FileStream file, uint chunksize)
 	{
 		ZStream strm = new();
 		Index index = new Index();
@@ -82,7 +83,7 @@ public static class Core
 						ret == ZResult.BUF_ERROR ||
 						ret == ZResult.VERSION_ERROR)
 						throw new ZException(ret);
-					
+
 					if (strm.NextOut != null)
 					{
 						// Count how many "@"s are in NextIn
@@ -104,11 +105,11 @@ public static class Core
 							offsetArraySize++;
 						}
 						prevAvailOut = strm.AvailOut > 0 ? (int)strm.AvailOut : 0;
-						
+
 						if ((strm.DataType & 128) != 0 && (strm.DataType & 64) == 0)
 						{
 							// Add the first point after the header
-							if (totout == 0) 
+							if (totout == 0)
 								index.AddPoint(strm.DataType & 7, totin, totout, strm.AvailOut, window, new byte[0]);
 							else
 							{
@@ -147,32 +148,22 @@ public static class Core
 		}
 	}
 
-// 240k / 1100 = 218
-// 240k / 300  = 800
+	// 240k / 1100 = 218
+	// 240k / 300  = 800
 
-// 218*700 = 152600 = 152k
-// 240k - 152600 = 93160
-// 240k - 218*1100 = 5960
-// 5960/700 = 8.5
+	// 218*700 = 152600 = 152k
+	// 240k - 152600 = 93160
+	// 240k - 218*1100 = 5960
+	// 5960/700 = 8.5
 
-
-	private static int TryCopy<T>(T[] src, int srcOffset, T[] dst,
-		int length) where T : unmanaged
-	{
-		var minDstLen = Math.Min(dst.Length, length);
-		var srcDstLen = Math.Min(src.Length - srcOffset, minDstLen);
-		Array.Copy(src, srcOffset, dst, 0, srcDstLen);
-		return srcDstLen;
-	}
-
-
-	public static int ExtractDeflateIndex(
-		byte[] fileBuffer, Point from, Point to, byte[] buf)
+	public static unsafe int ExtractDeflateIndex(
+		Memory<byte> fileBuffer, Point from, Point to, byte[] buf)
 	{
 		// lock (o) {
 		// no need to pin (I guess); it's an unmanaged struct on stack
 		using var strm = new ZStream();
-		byte[] input = new byte[CHUNK];
+		Memory<byte> input;
+		MemoryHandle hInput = new MemoryHandle();
 		var len = (int)(to.Output - from.Output);
 
 		ZResult ret;
@@ -189,7 +180,7 @@ public static class Core
 		var posInFile = from.Bits == 0 ? 1 : 0;
 		if (from.Bits != 0)
 		{
-			value = fileBuffer[0];
+			value = fileBuffer.Span[0];
 			InflatePrime(strm, from.Bits, value >> (8 - from.Bits));
 			posInFile++;
 		}
@@ -202,11 +193,14 @@ public static class Core
 		{
 			if (strm.AvailIn == 0)
 			{
-				value = TryCopy(fileBuffer, posInFile, input, (int)CHUNK);
+				value = Math.Min(CHUNK, fileBuffer.Length - posInFile);
+				input = fileBuffer.Slice(posInFile, value);
+				hInput.Dispose();
+				hInput = input.Pin();
 				strm.AvailIn = (uint)value;
 				posInFile += value;
-				if (value == 0) throw new ZException(ZResult.DATA_ERROR);
-				strm.NextIn = input;
+				if (value == 0) throw new ZException(ZResult.DATA_ERROR);				
+				strm.Ptr->next_in = (byte*)hInput.Pointer;
 			}
 			ret = Inflate(strm, ZFlush.NO_FLUSH);
 			// strm.NextOut.PrintASCII(32*1024-1);

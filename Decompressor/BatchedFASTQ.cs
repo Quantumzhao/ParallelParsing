@@ -3,6 +3,7 @@ using System.Buffers;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Text;
 using ParallelParsing.Common;
 using ParallelParsing.ZRan.NET;
@@ -41,7 +42,7 @@ class BatchedFASTQ : IEnumerable<FastqRecord>, IDisposable
 			_Current = default;
 			_Tasks = new(index.Count);
 		}
-		public const int RECORD_CACHE_MAX_LENGTH = 40000;
+		public const int RECORD_CACHE_MAX_LENGTH = 20000;
 		public ArrayPool<byte> BufferPool;
 		public ConcurrentQueue<FastqRecord> RecordCache;
 		public LazyFileReader _Reader;
@@ -58,7 +59,6 @@ class BatchedFASTQ : IEnumerable<FastqRecord>, IDisposable
 			// Console.WriteLine(counter);
 		}
 
-static object o = new object();
 		public bool MoveNext()
 		{
 			// if (RecordCache.Count == 0) Console.WriteLine(RecordCache.Count);
@@ -66,10 +66,9 @@ static object o = new object();
 				_Reader.TryGetNewPartition(out var entry))
 			{
 				var populateCache = Task.Run(() => {
-					IReadOnlyList<FastqRecord> rs;
-					(var from, var to, var inBuf) = entry;
-					// var buf = BufferPool.Rent(_Index.ChunkMaxBytes);
-					var buf = new byte[8_000_000];
+					IReadOnlyCollection<FastqRecord> rs;
+					(var from, var to, var inBuf, var owner) = entry;
+					var buf = BufferPool.Rent((int)(to.Output - from.Output));
 					// lock (o)
 					// {
 					Core.ExtractDeflateIndex(inBuf, from, to, buf);
@@ -82,9 +81,11 @@ static object o = new object();
 					// counter++;
 					// Console.WriteLine(FastqRecord.counter);
 					// if (rs.Count != 10000) Console.WriteLine(rs.Count);
-					// Array.Clear(buf);
+					Array.Clear(buf);
+					inBuf.Span.Clear();
+					owner.Dispose();
 					// Array.Clear(inBuf);
-					// BufferPool.Return(buf);
+					BufferPool.Return(buf);
 					// BufferPool.Return(inBuf);
 					// }
 					foreach (var r in rs) RecordCache.Enqueue(r);

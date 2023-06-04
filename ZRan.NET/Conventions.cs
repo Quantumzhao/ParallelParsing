@@ -36,10 +36,10 @@ public static class Constants
 	public const string ZLIB_VERSION = "1.2.11";
 
 	// sliding window size
-	public const uint WINSIZE = 32768U;
+	public const int WINSIZE = 32768;
 
 	// file input buffer size
-	public const uint CHUNK = 16384;
+	public const int CHUNK = 16384;
 }
 
 public class ZException : Exception

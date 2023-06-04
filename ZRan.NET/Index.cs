@@ -63,7 +63,7 @@ public struct Point
 	// preceding 32K of uncompressed data
 	public readonly byte[] Window;
 
-	public byte[] offset;
+	public byte[]? offset;
 
 	public Point(long output, long input, int bits)
 	{
@@ -71,7 +71,7 @@ public struct Point
 		this.Input = input;
 		this.Bits = bits;
 		this.Window = new byte[WINSIZE];
-		this.offset = new byte[WINSIZE];
+		this.offset = null;
 	}
 
 	internal Point(long output, long input, int bits, byte[] window)
