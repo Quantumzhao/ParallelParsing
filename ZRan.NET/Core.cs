@@ -157,13 +157,14 @@ public static class Core
 	// 5960/700 = 8.5
 
 	public static unsafe int ExtractDeflateIndex(
-		Memory<byte> fileBuffer, Point from, Point to, byte[] buf)
+		Memory<byte> fileBuffer, Point from, Point to, Memory<byte> buf)
 	{
 		// lock (o) {
 		// no need to pin (I guess); it's an unmanaged struct on stack
 		using var strm = new ZStream();
 		Memory<byte> input;
 		MemoryHandle hInput = new MemoryHandle();
+		MemoryHandle hBuf = new MemoryHandle();
 		var len = (int)(to.Output - from.Output);
 
 		ZResult ret;
@@ -188,7 +189,8 @@ public static class Core
 
 		strm.AvailIn = 0;
 		strm.AvailOut = (uint)len;
-		strm.NextOut = buf;
+		hBuf = buf.Pin();
+		strm.Ptr->next_out = (byte*)hBuf.Pointer;
 		do
 		{
 			if (strm.AvailIn == 0)

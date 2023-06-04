@@ -79,7 +79,7 @@ public struct CombinedMemory
 	private Memory<byte> _Rest;
 	public readonly int Length;
 
-	public CombinedMemory(byte[]? prepend, byte[] rest)
+	public CombinedMemory(byte[]? prepend, Memory<byte> rest)
 	{
 		_Prepend = prepend;
 		_Rest = rest;

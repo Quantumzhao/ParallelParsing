@@ -46,7 +46,7 @@ public sealed class BatchedFASTQ : IEnumerable<FastqRecord>, IDisposable
 			_Index = index;
 			_Reader = new(index, gzipPath, BufferPool, enableSsdOptimization);
 			_Current = default;
-			_Tasks = new(index.Count / 2);
+			_Tasks = new(index.Count / 4);
 		}
 		public const int RECORD_CACHE_MAX_LENGTH = 10000;
 		public ArrayPool<byte> BufferPool;
@@ -76,13 +76,16 @@ Stopwatch sw = new Stopwatch();
 					var populateCache = Scheduler.Run<int>(1, 1, () => {
 						IEnumerable<FastqRecord> rs;
 						(var from, var to, var inBuf, var owner) = entry;
-						var buf = BufferPool.Rent((int)(to.Output - from.Output));
+						var bufOwner = MemoryPool<byte>.Shared.Rent((int)(to.Output - from.Output));
+						var buf = bufOwner.Memory;
 						Core.ExtractDeflateIndex(inBuf, from, to, buf);
 						rs = Parsing.Parse(new CombinedMemory(from.offset, buf));
 						foreach (var r in rs) RecordCache.Enqueue(r);
-						Array.Clear(buf);
+						// Array.Clear(buf);
 						owner.Dispose();
-						BufferPool.Return(buf);
+						buf.Span.Clear();
+						bufOwner.Dispose();
+						// BufferPool.Return(buf);
 						return 0;
 					}).ContinueWith(t => _Tasks.Remove(t));
 					_Tasks.Add(populateCache);
