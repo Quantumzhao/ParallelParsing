@@ -16,7 +16,7 @@ public unsafe static class Parsing
 		string? seq;
 		string? other;
 		string? quality;
-		Collection<FastqRecord> ret = new Collection<FastqRecord>();
+		// Collection<FastqRecord> ret = new Collection<FastqRecord>();
 
 		for (int i = 0; i < raw.Length; )
 		{
@@ -50,7 +50,6 @@ public unsafe static class Parsing
 	}
 	private static string? ParseLine(ref int pos, CombinedMemory raw)
 	{
-		var sb = new StringBuilder();
 		var start = pos;
 
 		while (true)

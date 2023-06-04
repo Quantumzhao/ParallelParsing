@@ -17,7 +17,6 @@ namespace ParallelParsing;
 
 public class Program
 {
-    public static int readByteSize = 64;
     static void Main(string[] args)
     {
         // var gzipPath = "./../Gzipped_FASTQ_Files/SRR11192680_original.fastq.gz";
@@ -32,9 +31,9 @@ public class Program
         var sw = new Stopwatch();
         var fs = File.OpenRead(gzipPath);
         // sw.Start();
-        var index = Core.BuildDeflateIndex(fs, 2400);
+        var index = Core.BuildDeflateIndex(fs, 24000);
         // sw.Stop();
-        Console.WriteLine("build index elapsed: " + sw.ElapsedMilliseconds);
+        // Console.WriteLine("build index elapsed: " + sw.ElapsedMilliseconds);
         fs.Dispose();
 
         // fs = File.OpenRead(gzipPath);

@@ -24,7 +24,7 @@ public sealed class LazyFileReader : IDisposable
 	private bool _IsEOF = false;
 	private int _CurrPoint = 0;
 	// private bool _CanGetNewPartition = true;
-	byte[] buf;
+	// byte[] buf;
 
 	public LazyFileReader(Index index, string path, ArrayPool<byte> pool, bool enableSsdOptimization)
 	{

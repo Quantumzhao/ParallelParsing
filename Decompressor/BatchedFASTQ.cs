@@ -70,7 +70,7 @@ Stopwatch sw = new Stopwatch();
 			// if (RecordCache.Count == 0) Console.WriteLine(RecordCache.Count);
 			if (RecordCache.Count <= RECORD_CACHE_MAX_LENGTH)
 			{
-				sw.Start();
+				// sw.Start();
 				if (_Reader.TryGetNewPartition(out var entry))
 				{
 					var populateCache = Scheduler.Run<int>(1, 1, () => {
@@ -81,16 +81,15 @@ Stopwatch sw = new Stopwatch();
 						rs = Parsing.Parse(new CombinedMemory(from.offset, buf));
 						foreach (var r in rs) RecordCache.Enqueue(r);
 						Array.Clear(buf);
-						inBuf.Span.Clear();
 						owner.Dispose();
 						BufferPool.Return(buf);
 						return 0;
 					}).ContinueWith(t => _Tasks.Remove(t));
 					_Tasks.Add(populateCache);
 				}
-				sw.Stop();
-				if (sw.ElapsedMilliseconds != 0) Console.WriteLine(sw.ElapsedMilliseconds);
-				sw.Reset();
+				// sw.Stop();
+				// if (sw.ElapsedMilliseconds != 0) Console.WriteLine(sw.ElapsedMilliseconds);
+				// sw.Reset();
 			}
 			if (RecordCache.TryDequeue(out var res))
 			{
