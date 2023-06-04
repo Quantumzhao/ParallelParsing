@@ -16,13 +16,13 @@ public static class IndexIO
 
 		for (int i = 0; i < index.Count; i++)
 		{
-			bw.Write(index.List[i].Output);
-			bw.Write(index.List[i].Input);
-			bw.Write(index.List[i].Bits);
-			bw.Write(index.List[i].Window.Length);
-			bw.Write(index.List[i].Window);
-			bw.Write(index.List[i].offset.Length);
-			bw.Write(index.List[i].offset);
+			bw.Write(index[i].Output);
+			bw.Write(index[i].Input);
+			bw.Write(index[i].Bits);
+			bw.Write(index[i].Window.Length);
+			bw.Write(index[i].Window);
+			bw.Write(index[i].offset.Length);
+			bw.Write(index[i].offset);
 		}
 	}
 
