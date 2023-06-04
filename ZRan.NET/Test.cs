@@ -9,53 +9,31 @@ using static ParallelParsing.ZRan.NET.Compat;
 using SDebug = System.Diagnostics.Debug;
 
 
-//Bug: when there are more than 93 points in index, it will stop running
 
 // var testFile = "../Gzipped_FASTQ_Files/SRR11192680_original.fastq.gz";
-var testFile = "../Benchmark//Samples/1536000.gz";
+var testFile = "../Benchmark/Samples/196608000.gz";
 var fs = File.OpenRead(testFile);
-var index = Core.BuildDeflateIndex_NEW(fs, 6000); //1048576L
-// var index = Core.BuildDeflateIndex_OLD(fs, span: 32768); //1048576L
-// var index = Core.BuildDeflateIndex(fs, chunksize: 1200);
-// i.Serialize("../Gzipped_FASTQ_Files/test1.fastq.gzi");
+var index = Core.BuildDeflateIndex_NEW(fs, 10000); 
+index.Serialize(testFile + "i");
 
-// Console.WriteLine(Core.BuildDeflateIndex_NEW(fs, span: 32768, 20000).List.Count());
-// chunsize 30,000 works for 12288000.gz
+
+// var index = IndexIO.Deserialize(testFile + "i");
+// using var file = File.Create("../Gzipped_FASTQ_Files/48000");
 
 //-----------------------------------------------------------------------------------------------------------
-// int x = 37;
-
-// fs.Position = 0;
-// var from = index.List[x];
-// // var to = index.List[x + 1];
-// var to = new Point(0, fs.Length, 0);
-// var outBuf = new byte[2_000_000]; // change size *****************************************
-// Core.ExtractDeflateIndex_OLD(fs, index, from.Output, outBuf, 1_600_000);
-// outBuf.PrintASCIIFirstAndLast(400);
-
-
-// var x = 0;
-// var len_in = index.List[x + 1].Input - index.List[x].Input + 1;
-// var from = index.List[x];
-// var to = index.List[x + 1];
-// var len_out = (int)(to.Output - from.Output);
-// var fileBuffer = new byte[len_in];
-// fs.Position = from.Input - 1;
-// fs.ReadExactly(fileBuffer, 0, (int)len_in);
-// var outBuf = new byte[len_out]; // change size *****************************************
-// Core.ExtractDeflateIndex(fileBuffer, from, to, outBuf);
-//-----------------------------------------------------------------------------------------------------------
+Console.WriteLine("index built");
 // for (int x = 0; x < index.List.Count - 1; x++)
 // {
-// 	var len_in = index.List[x + 1].Input - index.List[x].Input + 1;
 // 	var from = index.List[x];
 // 	var to = index.List[x + 1];
+// 	var len_in = to.Input - from.Input + 1;
 // 	var len_out = (int)(to.Output - from.Output);
 // 	var fileBuffer = new byte[len_in];
 // 	fs.Position = from.Input - 1;
 // 	fs.ReadExactly(fileBuffer, 0, (int)len_in);
 // 	var outBuf = new byte[len_out]; // change size *****************************************
 // 	Core.ExtractDeflateIndex(fileBuffer, from, to, outBuf);
+//     file.Write(outBuf);
 // 	// Core.ExtractDeflateIndex_OLD(fs, index, from.Output, outBuf, len_out);
 //     // outBuf.PrintASCIIFirstAndLast(1500);
 

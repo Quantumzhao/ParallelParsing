@@ -102,9 +102,10 @@ public sealed class Point
 		this.offset = new byte[WINSIZE];
 	}
 
-	internal Point(long output, long input, int bits, byte[] window)
+	internal Point(long output, long input, int bits, byte[] window, byte[] offset)
 	: this(output, input, bits)
 	{
 		this.Window = window;
+		this.offset = offset;
 	}
 }

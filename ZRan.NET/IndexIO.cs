@@ -22,6 +22,8 @@ public static class IndexIO
 			bw.Write(index.List[i].Bits);
 			bw.Write(index.List[i].Window.Length);
 			bw.Write(index.List[i].Window);
+			bw.Write(index.List[i].offset.Length);
+			bw.Write(index.List[i].offset);
 		}
 	}
 
@@ -43,7 +45,9 @@ public static class IndexIO
 			var bits = br.ReadInt32();
 			var winLen = br.ReadInt32();
 			var window = br.ReadBytes(winLen);
-			points[i] = new Point(output, input, bits, window);
+			var offsetLen = br.ReadInt32();
+			var offset = br.ReadBytes(offsetLen);
+			points[i] = new Point(output, input, bits, window, offset);
 		}
 
 		return new Index(ChunkSize) { 
