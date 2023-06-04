@@ -11,7 +11,7 @@ using Index = ParallelParsing.ZRan.NET.Index;
 
 namespace ParallelParsing;
 
-class BatchedFASTQ : IEnumerable<FastqRecord>, IDisposable
+public sealed class BatchedFASTQ : IEnumerable<FastqRecord>, IDisposable
 {
 	public BatchedFASTQ(string indexPath, string gzipPath, bool enableSsdOptimization)
 		: this(IndexIO.Deserialize(indexPath), gzipPath, enableSsdOptimization) { }
@@ -30,7 +30,7 @@ class BatchedFASTQ : IEnumerable<FastqRecord>, IDisposable
 		_Enumerator.Dispose();
 	}
 
-	private class Enumerator : IEnumerator<FastqRecord>
+	private sealed class Enumerator : IEnumerator<FastqRecord>
 	{
 		public Enumerator(Index index, string gzipPath, bool enableSsdOptimization)
 		{
@@ -40,9 +40,9 @@ class BatchedFASTQ : IEnumerable<FastqRecord>, IDisposable
 			_Index = index;
 			_Reader = new(index, gzipPath, BufferPool, enableSsdOptimization);
 			_Current = default;
-			_Tasks = new(index.Count);
+			_Tasks = new(index.Count / 2);
 		}
-		public const int RECORD_CACHE_MAX_LENGTH = 20000;
+		public const int RECORD_CACHE_MAX_LENGTH = 40000;
 		public ArrayPool<byte> BufferPool;
 		public ConcurrentQueue<FastqRecord> RecordCache;
 		public LazyFileReader _Reader;
@@ -66,30 +66,17 @@ class BatchedFASTQ : IEnumerable<FastqRecord>, IDisposable
 				_Reader.TryGetNewPartition(out var entry))
 			{
 				var populateCache = Task.Run(() => {
-					IReadOnlyCollection<FastqRecord> rs;
+					IEnumerable<FastqRecord> rs;
 					(var from, var to, var inBuf, var owner) = entry;
 					var buf = BufferPool.Rent((int)(to.Output - from.Output));
-					// lock (o)
-					// {
 					Core.ExtractDeflateIndex(inBuf, from, to, buf);
-					// }
-					// lock (o) {
-					// } 
-					// lock (o) 
-					// {
 					rs = Parsing.Parse(new CombinedMemory(from.offset, buf));
-					// counter++;
-					// Console.WriteLine(FastqRecord.counter);
-					// if (rs.Count != 10000) Console.WriteLine(rs.Count);
+					foreach (var r in rs) RecordCache.Enqueue(r);
 					Array.Clear(buf);
 					inBuf.Span.Clear();
 					owner.Dispose();
-					// Array.Clear(inBuf);
 					BufferPool.Return(buf);
-					// BufferPool.Return(inBuf);
-					// }
-					foreach (var r in rs) RecordCache.Enqueue(r);
-				});
+				}).ContinueWith(t => _Tasks.Remove(t));
 				_Tasks.Add(populateCache);
 			}
 

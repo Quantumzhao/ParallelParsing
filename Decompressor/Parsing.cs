@@ -9,7 +9,8 @@ namespace ParallelParsing;
 
 public unsafe static class Parsing
 {
-	public static IReadOnlyCollection<FastqRecord> Parse(CombinedMemory raw)
+	static object o = new object();
+	public static IEnumerable<FastqRecord> Parse(CombinedMemory raw)
 	{
 		string? id;
 		string? seq;
@@ -41,27 +42,28 @@ public unsafe static class Parsing
 			quality = ParseLine(ref i, raw);
 			if (quality == null) break;
 
-			ret.Add(new FastqRecord(id, seq, other, quality));
+			yield return new FastqRecord(id, seq, other, quality);
+			// ret.Add(new FastqRecord(id, seq, other, quality));
 		}
 
-		return ret;
+		// return ret;
 	}
 	private static string? ParseLine(ref int pos, CombinedMemory raw)
 	{
-		var start = pos;
+		var sb = new StringBuilder();
 
 		while (!IsNewLine(raw[pos]) && raw[pos] != 0)
 		{
+			sb.Append((char)raw[pos]);
+
 			pos++;
 		}
 
 		if (raw[pos] == 0) return null;
 
-		var ret = raw.Substring(start, pos);
-
 		// consume \n
 		pos++;
-		return ret;
+		return sb.ToString();
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -70,8 +72,8 @@ public unsafe static class Parsing
 
 public struct CombinedMemory
 {
-	private Memory<byte> _Prepend;
-	private Memory<byte> _Rest;
+	private byte[] _Prepend;
+	private byte[] _Rest;
 	public readonly int Length;
 
 	public CombinedMemory(byte[]? prepend, byte[] rest)
@@ -85,36 +87,12 @@ public struct CombinedMemory
 	{
 		get
 		{
-			if (i < _Prepend.Length) return _Prepend.Span[i];
+			if (i < _Prepend.Length) return _Prepend[i];
 			else
 			{
 				i -= _Prepend.Length;
-				return _Rest.Span[i];
+				return _Rest[i];
 			}
 		}
-	}
-
-	public string Substring(int from, int to)
-	{
-		var lenP = _Prepend.Length;
-		var lenR = _Rest.Length;
-		if (from < lenP && to < lenP)
-		{
-			return Encoding.ASCII.GetString(_Prepend.Slice(from, to - from).Span);
-		}
-		else if (from < lenP && to >= lenP)
-		{
-			var first = _Prepend.Slice(from, lenP - from);
-			var second = _Rest.Slice(0, to - lenP);
-			Span<byte> buf = stackalloc byte[to - from];
-			first.Span.CopyTo(buf);
-			second.Span.CopyTo(buf.Slice(_Prepend.Length - from));
-			return Encoding.ASCII.GetString(buf);
-		}
-		else if (from >= lenP && to >= lenP)
-		{
-			return Encoding.ASCII.GetString(_Rest.Slice(from - lenP, to - from).Span);
-		}
-		else throw new UnreachableException();
 	}
 }

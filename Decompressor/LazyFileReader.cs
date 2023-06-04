@@ -10,9 +10,9 @@ using System.Diagnostics;
 
 namespace ParallelParsing;
 
-public class LazyFileReader : IDisposable
+public sealed class LazyFileReader : IDisposable
 {
-	public const int FILE_THREADS_COUNT_SSD = 4;
+	public const int FILE_THREADS_COUNT_SSD = 8;
 	public const int FILE_THREADS_COUNT_HDD = 1;
 	
 	public readonly ConcurrentQueue<(Point from, Point to, Memory<byte> segment, IMemoryOwner<byte>)> PartitionQueue;
@@ -36,7 +36,7 @@ public class LazyFileReader : IDisposable
 					   new FileStream[FILE_THREADS_COUNT_HDD];
 		for (int i = 0; i < _FileReads.Length; i++)
 		{
-			_FileReads[i] = File.OpenRead(path);
+			_FileReads[i] = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read);
 		}
 	}
 
@@ -87,7 +87,7 @@ public class LazyFileReader : IDisposable
 		}
 
 		Task? readBytes = null;
-		if (!_IsEOF && PartitionQueue.Count <= 2) readBytes = Task.Run(TryReadMore);
+		if (!_IsEOF && PartitionQueue.Count <= 8) readBytes = Task.Run(TryReadMore);
 
 		if (PartitionQueue.TryDequeue(out entry))
 		{
@@ -95,6 +95,7 @@ public class LazyFileReader : IDisposable
 		}
 		else
 		{
+			// Console.WriteLine("here");
 			readBytes?.Wait();
 			// if (_IsEOF && PartitionQueue.Count == 0) Console.WriteLine("here");
 			return PartitionQueue.TryDequeue(out entry);
