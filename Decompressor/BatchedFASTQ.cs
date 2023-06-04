@@ -9,6 +9,7 @@ using System.Text;
 using ParallelParsing.Common;
 using ParallelParsing.ZRan.NET;
 using Index = ParallelParsing.ZRan.NET.Index;
+using PrioritySchedulingTools;
 
 namespace ParallelParsing;
 
@@ -22,12 +23,16 @@ public sealed class BatchedFASTQ : IEnumerable<FastqRecord>, IDisposable
 	}
 
 	private Enumerator _Enumerator;
+	private static CancellationTokenSource _Cts = new();
+	internal static OrderingScheduler Scheduler = new(Environment.ProcessorCount, _Cts.Token);
 
 	public IEnumerator<FastqRecord> GetEnumerator() => _Enumerator;
 	IEnumerator IEnumerable.GetEnumerator() => _Enumerator;
 
 	public void Dispose()
 	{
+		_Cts.Dispose();
+		Scheduler.WaitForShutdown();
 		_Enumerator.Dispose();
 	}
 
@@ -43,7 +48,7 @@ public sealed class BatchedFASTQ : IEnumerable<FastqRecord>, IDisposable
 			_Current = default;
 			_Tasks = new(index.Count / 2);
 		}
-		public const int RECORD_CACHE_MAX_LENGTH = 20000;
+		public const int RECORD_CACHE_MAX_LENGTH = 10000;
 		public ArrayPool<byte> BufferPool;
 		public ConcurrentQueue<FastqRecord> RecordCache;
 		public LazyFileReader _Reader;
@@ -52,7 +57,6 @@ public sealed class BatchedFASTQ : IEnumerable<FastqRecord>, IDisposable
 		public FastqRecord Current => _Current;
 		object IEnumerator.Current => this.Current;
 		private List<Task> _Tasks;
-		ConcurrentExclusiveSchedulerPair scheduler = new();
 
 		public void Dispose()
 		{
@@ -60,28 +64,34 @@ public sealed class BatchedFASTQ : IEnumerable<FastqRecord>, IDisposable
 			// Console.WriteLine(FastqRecord.counter);
 			// Console.WriteLine(counter);
 		}
-
+Stopwatch sw = new Stopwatch();
 		public bool MoveNext()
 		{
 			// if (RecordCache.Count == 0) Console.WriteLine(RecordCache.Count);
-			if (RecordCache.Count <= RECORD_CACHE_MAX_LENGTH &&
-				_Reader.TryGetNewPartition(out var entry))
+			if (RecordCache.Count <= RECORD_CACHE_MAX_LENGTH)
 			{
-				var populateCache = Task.Run(() => {
-					IEnumerable<FastqRecord> rs;
-					(var from, var to, var inBuf, var owner) = entry;
-					var buf = BufferPool.Rent((int)(to.Output - from.Output));
-					Core.ExtractDeflateIndex(inBuf, from, to, buf);
-					rs = Parsing.Parse(new CombinedMemory(from.offset, buf));
-					foreach (var r in rs) RecordCache.Enqueue(r);
-					Array.Clear(buf);
-					inBuf.Span.Clear();
-					owner.Dispose();
-					BufferPool.Return(buf);
-				}).ContinueWith(t => _Tasks.Remove(t));
-				_Tasks.Add(populateCache);
+				sw.Start();
+				if (_Reader.TryGetNewPartition(out var entry))
+				{
+					var populateCache = Scheduler.Run<int>(1, 1, () => {
+						IEnumerable<FastqRecord> rs;
+						(var from, var to, var inBuf, var owner) = entry;
+						var buf = BufferPool.Rent((int)(to.Output - from.Output));
+						Core.ExtractDeflateIndex(inBuf, from, to, buf);
+						rs = Parsing.Parse(new CombinedMemory(from.offset, buf));
+						foreach (var r in rs) RecordCache.Enqueue(r);
+						Array.Clear(buf);
+						inBuf.Span.Clear();
+						owner.Dispose();
+						BufferPool.Return(buf);
+						return 0;
+					}).ContinueWith(t => _Tasks.Remove(t));
+					_Tasks.Add(populateCache);
+				}
+				sw.Stop();
+				if (sw.ElapsedMilliseconds != 0) Console.WriteLine(sw.ElapsedMilliseconds);
+				sw.Reset();
 			}
-
 			if (RecordCache.TryDequeue(out var res))
 			{
 				_Current = res;

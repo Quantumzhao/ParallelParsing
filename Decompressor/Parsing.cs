@@ -51,19 +51,22 @@ public unsafe static class Parsing
 	private static string? ParseLine(ref int pos, CombinedMemory raw)
 	{
 		var sb = new StringBuilder();
+		var start = pos;
 
-		while (!IsNewLine(raw[pos]) && raw[pos] != 0)
+		while (true)
 		{
-			sb.Append((char)raw[pos]);
+			var b = raw[pos];
+			if (IsNewLine(b) || b == 0) break;
 
 			pos++;
 		}
 
 		if (raw[pos] == 0) return null;
+		var ret = raw.Substring(start, pos);
 
 		// consume \n
 		pos++;
-		return sb.ToString();
+		return ret;
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -72,27 +75,48 @@ public unsafe static class Parsing
 
 public struct CombinedMemory
 {
-	private byte[] _Prepend;
-	private byte[] _Rest;
+	private Memory<byte> _Prepend;
+	private int _LengthP;
+	private Memory<byte> _Rest;
 	public readonly int Length;
 
 	public CombinedMemory(byte[]? prepend, byte[] rest)
 	{
-		_Prepend = prepend ?? Array.Empty<byte>();
+		_Prepend = prepend;
 		_Rest = rest;
-		Length = _Prepend.Length + _Rest.Length;
+		_LengthP = prepend?.Length ?? 0;
+		Length = _LengthP + _Rest.Length;
 	}
 
 	public byte this[int i]
 	{
 		get
 		{
-			if (i < _Prepend.Length) return _Prepend[i];
-			else
-			{
-				i -= _Prepend.Length;
-				return _Rest[i];
-			}
+			if (i < _LengthP) return _Prepend.Span[i];
+			else return _Rest.Span[i - _LengthP];
+		}
+	}
+
+	public string Substring(int from, int to)
+	{
+		if (from < _LengthP && to < _LengthP)
+		{
+			var sub = _Prepend.Slice(from, to - from);
+			return Encoding.ASCII.GetString(sub.Span);
+		}
+		else if (from < _LengthP && to >= _LengthP)
+		{
+			Span<byte> ret = stackalloc byte[to - from];
+			var pre = _Prepend.Slice(from, _LengthP - from);
+			var post = _Rest.Slice(0, to - _LengthP);
+			pre.Span.CopyTo(ret);
+			post.Span.CopyTo(ret.Slice(_LengthP - from));
+			return Encoding.ASCII.GetString(ret);
+		}
+		else
+		{
+			var sub = _Rest.Slice(from - _LengthP, to - from);
+			return Encoding.ASCII.GetString(sub.Span);
 		}
 	}
 }

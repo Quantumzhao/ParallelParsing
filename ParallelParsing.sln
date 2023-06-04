@@ -1,0 +1,40 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ZRan.NET", "ZRan.NET\ZRan.NET.csproj", "{B4D22F04-2EC3-434F-AC6C-3072600EBD67}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PrioritySchedulingTools", "PrioritySchedulingTools\PrioritySchedulingTools.csproj", "{3306FD47-4DC9-4999-888E-15E7A8D1ED7B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common", "Common\Common.csproj", "{8DD44722-D3D5-49E0-80B4-48C7B9B9BF3A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Decompressor", "Decompressor\Decompressor.csproj", "{E812516A-1770-4BCB-8A82-3E529DE11AC1}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{B4D22F04-2EC3-434F-AC6C-3072600EBD67}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B4D22F04-2EC3-434F-AC6C-3072600EBD67}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B4D22F04-2EC3-434F-AC6C-3072600EBD67}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B4D22F04-2EC3-434F-AC6C-3072600EBD67}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3306FD47-4DC9-4999-888E-15E7A8D1ED7B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3306FD47-4DC9-4999-888E-15E7A8D1ED7B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3306FD47-4DC9-4999-888E-15E7A8D1ED7B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3306FD47-4DC9-4999-888E-15E7A8D1ED7B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8DD44722-D3D5-49E0-80B4-48C7B9B9BF3A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8DD44722-D3D5-49E0-80B4-48C7B9B9BF3A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8DD44722-D3D5-49E0-80B4-48C7B9B9BF3A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8DD44722-D3D5-49E0-80B4-48C7B9B9BF3A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E812516A-1770-4BCB-8A82-3E529DE11AC1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E812516A-1770-4BCB-8A82-3E529DE11AC1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E812516A-1770-4BCB-8A82-3E529DE11AC1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E812516A-1770-4BCB-8A82-3E529DE11AC1}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

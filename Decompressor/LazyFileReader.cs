@@ -32,7 +32,7 @@ public sealed class LazyFileReader : IDisposable
 		PartitionQueue = new();
 		_BufferPool = pool;
 		// _IndexEnumerator = _Index.List.GetEnumerator();
-		buf = File.ReadAllBytes(path);
+		// buf = File.ReadAllBytes(path);
 		
 
 		_FileReads = enableSsdOptimization ?
@@ -40,8 +40,8 @@ public sealed class LazyFileReader : IDisposable
 					   new Stream[FILE_THREADS_COUNT_HDD];
 		for (int i = 0; i < _FileReads.Length; i++)
 		{
-			// _FileReads[i] = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-			_FileReads[i] = new MemoryStream(buf);
+			_FileReads[i] = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+			// _FileReads[i] = new MemoryStream(buf);
 		}
 	}
 
@@ -50,7 +50,7 @@ public sealed class LazyFileReader : IDisposable
 		Parallel.ForEach(_FileReads, f => f.Dispose());
 	}
 
-	private void TryReadMore()
+	private int TryReadMore()
 	{
 		Parallel.ForEach(_FileReads, fs => {
 			if (_IsEOF) return;
@@ -81,6 +81,9 @@ public sealed class LazyFileReader : IDisposable
 			fs.Read(buf.Span);
 			PartitionQueue.Enqueue((from, to, buf, bufOwner));
 		});
+
+		
+		return 0;
 	}
 
 	public bool TryGetNewPartition(out (Point from, Point to, Memory<byte> segment, IMemoryOwner<byte>) entry)
@@ -92,7 +95,7 @@ public sealed class LazyFileReader : IDisposable
 		}
 
 		Task? readBytes = null;
-		if (!_IsEOF && PartitionQueue.Count <= 8) readBytes = Task.Run(TryReadMore);
+		if (!_IsEOF && PartitionQueue.Count <= 32) readBytes = BatchedFASTQ.Scheduler.Run<int>(0, 0, TryReadMore);
 
 		if (PartitionQueue.TryDequeue(out entry))
 		{
@@ -100,8 +103,12 @@ public sealed class LazyFileReader : IDisposable
 		}
 		else
 		{
+			// var sw = new Stopwatch();
+			// sw.Start();
 			// Console.WriteLine("here");
 			readBytes?.Wait();
+			// sw.Stop();
+			// Console.WriteLine(sw.ElapsedMilliseconds);
 			// if (_IsEOF && PartitionQueue.Count == 0) Console.WriteLine("here");
 			return PartitionQueue.TryDequeue(out entry);
 			// int prevCount = PartitionQueue.Count;
