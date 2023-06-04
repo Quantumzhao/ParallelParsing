@@ -18,11 +18,12 @@ public sealed class LazyFileReader : IDisposable
 	public readonly ConcurrentQueue<(Point from, Point to, Memory<byte> segment, IMemoryOwner<byte>)> PartitionQueue;
 	private Index _Index;
 	// private IEnumerator<Point> _IndexEnumerator;
-	private FileStream[] _FileReads;
+	private Stream[] _FileReads;
 	private ArrayPool<byte> _BufferPool;
 	private bool _IsEOF = false;
 	private int _CurrPoint = 0;
 	// private bool _CanGetNewPartition = true;
+	byte[] buf;
 
 	public LazyFileReader(Index index, string path, ArrayPool<byte> pool, bool enableSsdOptimization)
 	{
@@ -30,13 +31,16 @@ public sealed class LazyFileReader : IDisposable
 		PartitionQueue = new();
 		_BufferPool = pool;
 		// _IndexEnumerator = _Index.List.GetEnumerator();
+		buf = File.ReadAllBytes(path);
+		
 
 		_FileReads = enableSsdOptimization ?
-					   new FileStream[FILE_THREADS_COUNT_SSD] :
-					   new FileStream[FILE_THREADS_COUNT_HDD];
+					   new Stream[FILE_THREADS_COUNT_SSD] :
+					   new Stream[FILE_THREADS_COUNT_HDD];
 		for (int i = 0; i < _FileReads.Length; i++)
 		{
-			_FileReads[i] = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+			// _FileReads[i] = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+			_FileReads[i] = new MemoryStream(buf);
 		}
 	}
 

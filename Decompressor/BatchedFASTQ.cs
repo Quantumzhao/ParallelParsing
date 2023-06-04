@@ -1,3 +1,4 @@
+using System.Threading.Tasks;
 
 using System.Buffers;
 using System.Collections;
@@ -42,7 +43,7 @@ public sealed class BatchedFASTQ : IEnumerable<FastqRecord>, IDisposable
 			_Current = default;
 			_Tasks = new(index.Count / 2);
 		}
-		public const int RECORD_CACHE_MAX_LENGTH = 40000;
+		public const int RECORD_CACHE_MAX_LENGTH = 20000;
 		public ArrayPool<byte> BufferPool;
 		public ConcurrentQueue<FastqRecord> RecordCache;
 		public LazyFileReader _Reader;
@@ -51,6 +52,7 @@ public sealed class BatchedFASTQ : IEnumerable<FastqRecord>, IDisposable
 		public FastqRecord Current => _Current;
 		object IEnumerator.Current => this.Current;
 		private List<Task> _Tasks;
+		ConcurrentExclusiveSchedulerPair scheduler = new();
 
 		public void Dispose()
 		{
