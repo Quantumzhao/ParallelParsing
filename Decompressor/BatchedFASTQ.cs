@@ -39,7 +39,7 @@ class BatchedFASTQ : IEnumerable<FastqRecord>, IDisposable
 			_Index = index;
 			_Reader = new(index, gzipPath, BufferPool, enableSsdOptimization);
 			_Current = default;
-			_Tasks = new(index.List.Count);
+			_Tasks = new(index.Count);
 		}
 		public const int RECORD_CACHE_MAX_LENGTH = 40000;
 		public ArrayPool<byte> BufferPool;

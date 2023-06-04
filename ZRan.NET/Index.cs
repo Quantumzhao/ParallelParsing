@@ -6,48 +6,32 @@ namespace ParallelParsing.ZRan.NET;
 public sealed class Index
 {
 	// allocated list of entries
-	public List<Point> List;
-	// chunk size
-	public uint ChunkSize;
+	private List<Point> _List;
 	public int ChunkMaxBytes;
 
-	public Index(uint chunksize)
+	public Index()
 	{
-		List = new List<Point>(8);
-		ChunkSize = chunksize;
+		_List = new List<Point>(8);
+	}
+	public Index(IEnumerable<Point> points)
+	{
+		_List = new(points);
 	}
 
-	public void AddPoint(int bits, long input, long output, byte[] window)
+	public Point this[int index] => _List[index];
+	public int Count => _List.Count;
+	public void Add(Point p) => _List.Add(p);
+
+	public void AddPoint(int bits, long input, long output, uint left, byte[] window, byte[] offset)
 	{
-		if (this.List.Count == 0)
+
+		if (this.Count == 0)
 		{
 			this.ChunkMaxBytes = (int)output;
 		}
 		else 
 		{
-			int outputSize = (int)output - (int)this.List[this.List.Count - 1].Output;
-
-			if (outputSize > this.ChunkMaxBytes)
-				this.ChunkMaxBytes = outputSize;
-		}
-		
-		Point next = new Point(output, input, bits);
-
-		Array.Copy(window, next.Window, WINSIZE);
-		
-		this.List.Add(next);
-	}
-
-	public void AddPoint_NEW(int bits, long input, long output, uint left, byte[] window, byte[] offset)
-	{
-
-		if (this.List.Count == 0)
-		{
-			this.ChunkMaxBytes = (int)output;
-		}
-		else 
-		{
-			int outputSize = (int)output - (int)this.List[this.List.Count - 1].Output;
+			int outputSize = (int)output - (int)this[this.Count - 1].Output;
 
 			if (outputSize > this.ChunkMaxBytes)
 				this.ChunkMaxBytes = outputSize;
@@ -61,23 +45,11 @@ public sealed class Index
 			
 		if (left < WINSIZE)
 			Array.Copy(window, 0, next.Window, left, WINSIZE - left);
-		this.List.Add(next);
-	}
-
-	public void AddPoint_OLD(int bits, long input, long output, uint left, byte[] window)
-	{
-		Point next = new Point(output, input, bits);
-
-		if (left != 0)
-			Array.Copy(window, WINSIZE - left, next.Window, 0, left);
-			
-		if (left < WINSIZE)
-			Array.Copy(window, 0, next.Window, left, WINSIZE - left);
-		this.List.Add(next);
+		this.Add(next);
 	}
 }
 
-public sealed class Point
+public struct Point
 {
 	// corresponding offset in uncompressed data
 	public readonly long Output;

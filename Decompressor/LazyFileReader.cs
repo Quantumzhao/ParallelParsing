@@ -57,10 +57,10 @@ public class LazyFileReader : IDisposable
 			int len;
 			lock (this)
 			{
-				from = _Index.List[_CurrPoint];
+				from = _Index[_CurrPoint];
 
 				_CurrPoint++;
-				if (_CurrPoint < _Index.List.Count) to = _Index.List[_CurrPoint];
+				if (_CurrPoint < _Index.Count) to = _Index[_CurrPoint];
 				else
 				{
 					_IsEOF = true;
