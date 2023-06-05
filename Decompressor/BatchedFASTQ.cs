@@ -40,7 +40,7 @@ public sealed class BatchedFASTQ : IEnumerable<FastqRecord>, IDisposable
 	{
 		public Enumerator(Index index, string gzipPath, bool enableSsdOptimization)
 		{
-			BufferPool = ArrayPool<byte>.Create(index.ChunkMaxBytes, 1024);
+			// BufferPool = ArrayPool<byte>.Create(index.ChunkMaxBytes, 1024);
 			_Reader = new LazyFileReader(index, gzipPath, BufferPool, enableSsdOptimization);
 			RecordCache = new();
 			_Index = index;
