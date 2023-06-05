@@ -10,6 +10,7 @@ public static class IndexIO
 		using var stream = File.Create(path);
 		using var bw = new BinaryWriter(stream);
 
+		bw.Write(0);
 		bw.Write(index.ChunkMaxBytes);
 
 		bw.Write(index.Count);
@@ -31,6 +32,7 @@ public static class IndexIO
 		using var stream = File.OpenRead(path);
 		using var br = new BinaryReader(stream);
 
+		br.ReadInt32();
 		var chunkMaxBytes = br.ReadInt32();
 
 		var count = br.ReadInt32();
