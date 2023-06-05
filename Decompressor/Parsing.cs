@@ -2,6 +2,7 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 using ParallelParsing.Common;
 
@@ -18,13 +19,13 @@ public unsafe static class Parsing
 		string? quality;
 		// Collection<FastqRecord> ret = new Collection<FastqRecord>();
 
-		for (int i = 0; i < raw.Length; )
+		for (int i = 0; i < raw.Length;)
 		{
 			// empty space
 			if (raw[i] == '\0') break;
 
 			// skip @
-			if (raw[i] != '@') throw new Exception();
+			// if (raw[i] != '@') throw new Exception();
 			i++;
 			// counter++;
 			id = ParseLine(ref i, raw);
@@ -33,7 +34,7 @@ public unsafe static class Parsing
 			seq = ParseLine(ref i, raw);
 			if (seq == null) break;
 			// skip +
-			if (raw[i] != '+') throw new Exception();
+			// if (raw[i] != '+') throw new Exception();
 			i++;
 
 			other = ParseLine(ref i, raw);
@@ -96,6 +97,7 @@ public struct CombinedMemory
 		}
 	}
 
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public string Substring(int from, int to)
 	{
 		if (from < _LengthP && to < _LengthP)
