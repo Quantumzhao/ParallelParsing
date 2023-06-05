@@ -220,6 +220,8 @@ public static class Core
 		} while (strm.AvailOut != 0);
 
 		// compute the number of uncompressed bytes read after the offset
+		hInput.Dispose();
+		hBuf.Dispose();
 		return len - (int)strm.AvailOut;
 	}
 	// }

@@ -25,13 +25,12 @@ public struct FastqRecord : IDisposable
 		_Quality = qlt;
 	}
 
-	private Memory<byte> _Memory;
+	private Mem _Memory;
 	private Mem _Identifier;
 	private Mem _Sequence;
 	private Mem _Other;
 	private Mem _Quality;
-
-	internal IMemoryOwner<byte> Owner;
+	private IMemoryOwner<byte> Owner;
 
 	public string Identifier => Encoding.ASCII.GetString(_Identifier.Span);
 	public string Sequence => Encoding.ASCII.GetString(_Sequence.Span);
@@ -41,6 +40,6 @@ public struct FastqRecord : IDisposable
 	public void Dispose()
 	{
 		_Memory.Span.Clear();
-		Owner.Dispose();
+		Owner?.Dispose();
 	}
 }

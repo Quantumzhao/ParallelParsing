@@ -27,23 +27,23 @@ public unsafe static class Parsing
 			var start = i;
 
 			var idnFrom = i;
-			var idnLen = ParseLine(ref i, raw);
-			if (idnLen == -1) break;
+			var idnLen = ParseLine(ref i, raw) - 1;
+			if (idnLen < 0) break;
 
 			var seqFrom = i;
-			var seqLen = ParseLine(ref i, raw);
-			if (seqLen == -1) break;
+			var seqLen = ParseLine(ref i, raw) - 1;
+			if (seqLen < 0) break;
 			// skip +
 			// if (raw[i] != '+') throw new Exception();
 			i++;
 
 			var plsFrom = i;
-			var plsLen = ParseLine(ref i, raw);
-			if (plsLen == -1) break;
+			var plsLen = ParseLine(ref i, raw) - 1;
+			if (plsLen < 0) break;
 
 			var qltFrom = i;
-			var qltLen = ParseLine(ref i, raw);
-			if (qltLen == -1) break;
+			var qltLen = ParseLine(ref i, raw) - 1;
+			if (qltLen < 0) break;
 			var end = i;
 
 			var owner = MemoryPool<byte>.Shared.Rent(end - start);
@@ -73,14 +73,11 @@ public unsafe static class Parsing
 		}
 
 		if (raw[pos] == 0) return -1;
-		
+
 		// consume \n
 		pos++;
 		return pos - start;
 	}
-
-	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	private static bool IsNewLine(byte c) => c == '\n' || c == '\r';
 }
 
 public struct CombinedMemory

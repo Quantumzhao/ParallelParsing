@@ -20,17 +20,15 @@ public sealed class LazyFileReader : IDisposable
 	private Index _Index;
 	// private IEnumerator<Point> _IndexEnumerator;
 	private FileStream[] _FileReads;
-	private ArrayPool<byte> _BufferPool;
 	private bool _IsEOF = false;
 	private int _CurrPoint = 0;
 	// private bool _CanGetNewPartition = true;
 	// byte[] buf;
 
-	public LazyFileReader(Index index, string path, ArrayPool<byte> pool, bool enableSsdOptimization)
+	public LazyFileReader(Index index, string path, bool enableSsdOptimization)
 	{
 		_Index = index;
 		PartitionQueue = new();
-		_BufferPool = pool;
 		// _IndexEnumerator = _Index.List.GetEnumerator();
 		// buf = File.ReadAllBytes(path);
 		
@@ -75,7 +73,7 @@ public sealed class LazyFileReader : IDisposable
 				len = (int)(to.Input - from.Input + 1);
 			}
 			bufOwner = MemoryPool<byte>.Shared.Rent(len);
-			buf = bufOwner.Memory.Slice(0, len);
+			buf = bufOwner.Memory[..len];
 			
 			fs.Position = from.Input - 1;
 			fs.Read(buf.Span);
@@ -95,7 +93,7 @@ public sealed class LazyFileReader : IDisposable
 		}
 
 		Task? readBytes = null;
-		if (!_IsEOF && PartitionQueue.Count <= 32) readBytes = BatchedFASTQ.Scheduler.Run<int>(0, 0, TryReadMore);
+		if (!_IsEOF && PartitionQueue.Count <= 32) readBytes = Task.Run(TryReadMore);
 
 		if (PartitionQueue.TryDequeue(out entry))
 		{
