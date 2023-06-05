@@ -48,7 +48,7 @@ public sealed class BatchedFASTQ : IEnumerable<FastqRecord>, IDisposable
 			_Current = default;
 			_Tasks = new(index.Count / 4);
 		}
-		public const int RECORD_CACHE_MAX_LENGTH = 10000;
+		public const int RECORD_CACHE_MAX_LENGTH = 20000;
 		public ArrayPool<byte> BufferPool;
 		public ConcurrentQueue<FastqRecord> RecordCache;
 		public LazyFileReader _Reader;
