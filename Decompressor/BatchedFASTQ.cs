@@ -64,7 +64,7 @@ public sealed class BatchedFASTQ : IEnumerable<FastqRecord>, IDisposable
 			// Console.WriteLine(FastqRecord.counter);
 			// Console.WriteLine(counter);
 		}
-Stopwatch sw = new Stopwatch();
+
 		public bool MoveNext()
 		{
 			// if (RecordCache.Count == 0) Console.WriteLine(RecordCache.Count);
