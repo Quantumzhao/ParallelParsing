@@ -41,15 +41,14 @@ public sealed class BatchedFASTQ : IEnumerable<FastqRecord>, IDisposable
 		public Enumerator(Index index, string gzipPath, bool enableSsdOptimization)
 		{
 			// BufferPool = ArrayPool<byte>.Create(index.ChunkMaxBytes, 1024);
-			_Reader = new LazyFileReader(index, gzipPath, BufferPool, enableSsdOptimization);
+			// _Reader = new LazyFileReader(index, gzipPath, enableSsdOptimization);
 			RecordCache = new();
 			_Index = index;
-			_Reader = new(index, gzipPath, BufferPool, enableSsdOptimization);
+			_Reader = new(index, gzipPath, enableSsdOptimization);
 			_Current = default;
 			_Tasks = new(index.Count / 4);
 		}
 		public const int RECORD_CACHE_MAX_LENGTH = 20000;
-		public ArrayPool<byte> BufferPool;
 		public ConcurrentQueue<FastqRecord> RecordCache;
 		public LazyFileReader _Reader;
 		private Index _Index;
@@ -64,16 +63,17 @@ public sealed class BatchedFASTQ : IEnumerable<FastqRecord>, IDisposable
 			// Console.WriteLine(FastqRecord.counter);
 			// Console.WriteLine(counter);
 		}
-
+Stopwatch sw = new Stopwatch();
 		public bool MoveNext()
 		{
+			_Current.Dispose();
 			// if (RecordCache.Count == 0) Console.WriteLine(RecordCache.Count);
 			if (RecordCache.Count <= RECORD_CACHE_MAX_LENGTH)
 			{
 				// sw.Start();
 				if (_Reader.TryGetNewPartition(out var entry))
 				{
-					var populateCache = Scheduler.Run<int>(1, 1, () => {
+					var populateCache = Task.Run(() => {
 						IEnumerable<FastqRecord> rs;
 						(var from, var to, var inBuf, var owner) = entry;
 						var bufOwner = MemoryPool<byte>.Shared.Rent((int)(to.Output - from.Output));
@@ -82,11 +82,12 @@ public sealed class BatchedFASTQ : IEnumerable<FastqRecord>, IDisposable
 						rs = Parsing.Parse(new CombinedMemory(from.offset, buf));
 						foreach (var r in rs) RecordCache.Enqueue(r);
 						// Array.Clear(buf);
+						inBuf.Span.Clear();
 						owner.Dispose();
+						
 						buf.Span.Clear();
 						bufOwner.Dispose();
-						// BufferPool.Return(buf);
-						return 0;
+						// return 0;
 					}).ContinueWith(t => _Tasks.Remove(t));
 					_Tasks.Add(populateCache);
 				}
