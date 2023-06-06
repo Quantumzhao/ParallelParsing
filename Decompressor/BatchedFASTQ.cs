@@ -41,10 +41,10 @@ public sealed class BatchedFASTQ : IEnumerable<FastqRecord>, IDisposable
 		public Enumerator(Index index, string gzipPath, bool enableSsdOptimization)
 		{
 			// BufferPool = ArrayPool<byte>.Create(index.ChunkMaxBytes, 1024);
-			_Reader = new LazyFileReader(index, gzipPath, BufferPool, enableSsdOptimization);
+			_Reader = new LazyFileReader(index, gzipPath, enableSsdOptimization);
 			RecordCache = new();
 			_Index = index;
-			_Reader = new(index, gzipPath, BufferPool, enableSsdOptimization);
+			_Reader = new(index, gzipPath, enableSsdOptimization);
 			_Current = default;
 			_Tasks = new(index.Count / 4);
 		}

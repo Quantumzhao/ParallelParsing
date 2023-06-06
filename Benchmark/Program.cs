@@ -11,7 +11,8 @@ public class FileCompressionModeExample
 
     public static void Main()
     {
-        var summary = BenchmarkRunner.Run<Naive>();
+        // var summary = BenchmarkRunner.Run<Naive>();
+        var summary = BenchmarkRunner.Run<ParallelBenchmark>();
 
         // var instance = new Naive();
         // instance.GzipPath = "48000.gz";

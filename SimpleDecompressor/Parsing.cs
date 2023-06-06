@@ -32,7 +32,7 @@ public static class Parsing
 			other = ParseLine(raw);
 			quality = ParseLine(raw);
 
-			yield return new FastqRecord(id, seq, other, quality);
+			// yield return new FastqRecord(id, seq, other, quality);
 		}
 	}
 	private static string ParseLine(BigQueue<byte> raw)
