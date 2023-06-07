@@ -1,10 +1,6 @@
 
 using System.Buffers;
-using System.Collections.ObjectModel;
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-using System.Text;
 using ParallelParsing.Common;
 
 namespace ParallelParsing;
@@ -14,14 +10,11 @@ public unsafe static class Parsing
 	static object o = new object();
 	public static IEnumerable<FastqRecord> Parse(CombinedMemory raw)
 	{
-		// var ret = new List<FastqRecord>();
-
 		for (int i = 0; i < raw.Length;)
 		{
 			// empty space
 			if (raw[i] == '\0') break;
 
-			// if (raw[i] != '@') throw new Exception();
 			// skip @
 			i++;
 			var start = i;
@@ -34,7 +27,6 @@ public unsafe static class Parsing
 			var seqLen = ParseLine(ref i, raw) - 1;
 			if (seqLen < 0) break;
 			// skip +
-			// if (raw[i] != '+') throw new Exception();
 			i++;
 
 			var plsFrom = i;
@@ -55,10 +47,7 @@ public unsafe static class Parsing
 			var qlt = mem.Slice(qltFrom - start, qltLen);
 
 			yield return new FastqRecord(owner, idn, seq, pls, qlt);
-			// ret.Add(new FastqRecord(id, seq, other, quality));
 		}
-
-		// return ret;
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]

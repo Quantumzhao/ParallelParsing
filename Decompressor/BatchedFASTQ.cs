@@ -1,15 +1,9 @@
-using System.Threading.Tasks;
-
 using System.Buffers;
 using System.Collections;
 using System.Collections.Concurrent;
-using System.Collections.Immutable;
-using System.Diagnostics;
-using System.Text;
 using ParallelParsing.Common;
 using ParallelParsing.ZRan.NET;
 using Index = ParallelParsing.ZRan.NET.Index;
-using PrioritySchedulingTools;
 
 namespace ParallelParsing;
 
@@ -23,16 +17,12 @@ public sealed class BatchedFASTQ : IEnumerable<FastqRecord>, IDisposable
 	}
 
 	private Enumerator _Enumerator;
-	private static CancellationTokenSource _Cts = new();
-	internal static OrderingScheduler Scheduler = new(Environment.ProcessorCount, _Cts.Token);
 
 	public IEnumerator<FastqRecord> GetEnumerator() => _Enumerator;
 	IEnumerator IEnumerable.GetEnumerator() => _Enumerator;
 
 	public void Dispose()
 	{
-		_Cts.Dispose();
-		Scheduler.WaitForShutdown();
 		_Enumerator.Dispose();
 	}
 
@@ -40,12 +30,11 @@ public sealed class BatchedFASTQ : IEnumerable<FastqRecord>, IDisposable
 	{
 		public Enumerator(Index index, string gzipPath, bool enableSsdOptimization)
 		{
-			// BufferPool = ArrayPool<byte>.Create(index.ChunkMaxBytes, 1024);
-			// _Reader = new LazyFileReader(index, gzipPath, enableSsdOptimization);
 			RecordCache = new();
 			_Index = index;
 			_Reader = new(index, gzipPath, enableSsdOptimization);
 			_Current = default;
+			// an approximate estimate of the actively running tasks
 			_Tasks = new(index.Count / 4);
 		}
 		public const int RECORD_CACHE_MAX_LENGTH = 20000;
@@ -60,17 +49,14 @@ public sealed class BatchedFASTQ : IEnumerable<FastqRecord>, IDisposable
 		public void Dispose()
 		{
 			_Reader.Dispose();
-			// Console.WriteLine(FastqRecord.counter);
-			// Console.WriteLine(counter);
 		}
-// Stopwatch sw = new Stopwatch();
+
 		public bool MoveNext()
 		{
 			_Current.Dispose();
-			// if (RecordCache.Count == 0) Console.WriteLine(RecordCache.Count);
+
 			if (RecordCache.Count <= RECORD_CACHE_MAX_LENGTH)
 			{
-				// sw.Start();
 				if (_Reader.TryGetNewPartition(out var entry))
 				{
 					var populateCache = Task.Run(() => {
@@ -81,19 +67,15 @@ public sealed class BatchedFASTQ : IEnumerable<FastqRecord>, IDisposable
 						Core.ExtractDeflateIndex(inBuf, from, to, buf);
 						rs = Parsing.Parse(new CombinedMemory(from.offset, buf));
 						foreach (var r in rs) RecordCache.Enqueue(r);
-						// Array.Clear(buf);
+
 						inBuf.Span.Clear();
 						owner.Dispose();
-						
 						buf.Span.Clear();
 						bufOwner.Dispose();
-						// return 0;
-					}).ContinueWith(t => _Tasks.Remove(t));
+					})
+					.ContinueWith(t => _Tasks.Remove(t));
 					_Tasks.Add(populateCache);
 				}
-				// sw.Stop();
-				// if (sw.ElapsedMilliseconds != 0) Console.WriteLine(sw.ElapsedMilliseconds);
-				// sw.Reset();
 			}
 			if (RecordCache.TryDequeue(out var res))
 			{

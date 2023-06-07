@@ -12,7 +12,6 @@ public static class Parsing
 		string seq;
 		string other;
 		string quality;
-		List<FastqRecord> ret = new List<FastqRecord>(0);
 
 		for (int i = 0; !raw.IsAtEnd; i++)
 		{
@@ -32,7 +31,7 @@ public static class Parsing
 			other = ParseLine(raw);
 			quality = ParseLine(raw);
 
-			// yield return new FastqRecord(id, seq, other, quality);
+			yield return new FastqRecord(id, seq, other, quality);
 		}
 	}
 	private static string ParseLine(BigQueue<byte> raw)

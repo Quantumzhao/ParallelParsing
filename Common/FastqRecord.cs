@@ -8,14 +8,6 @@ namespace ParallelParsing.Common;
 
 public struct FastqRecord : IDisposable
 {
-	// public FastqRecord(string id, string seq, string other, string q)
-	// {
-	// 	Identifier = id;
-	// 	Sequence = seq;
-	// 	Quality = q;
-	// 	Other = other;
-	// }
-
 	public FastqRecord(IMemoryOwner<byte> owner, Mem idn, Mem seq, Mem pls, Mem qlt)
 	{
 		Owner = owner;
@@ -25,17 +17,65 @@ public struct FastqRecord : IDisposable
 		_Quality = qlt;
 	}
 
+	public FastqRecord(string idn, string seq, string pls, string qlt)
+	{
+		_IdentifierString = idn;
+		_SequenceString = seq;
+		_OtherString = pls;
+		_QualityString = qlt;
+	}
+
 	private Mem _Memory;
 	private Mem _Identifier;
 	private Mem _Sequence;
 	private Mem _Other;
 	private Mem _Quality;
-	private IMemoryOwner<byte> Owner;
+	private IMemoryOwner<byte>? Owner;
 
-	public string Identifier => Encoding.ASCII.GetString(_Identifier.Span);
-	public string Sequence => Encoding.ASCII.GetString(_Sequence.Span);
-	public string Other => Encoding.ASCII.GetString(_Other.Span);
-	public string Quality => Encoding.ASCII.GetString(_Quality.Span);
+	private string? _IdentifierString = null;
+	public string Identifier
+	{
+		get
+		{
+			if (_IdentifierString == null)
+				_IdentifierString = Encoding.ASCII.GetString(_Identifier.Span);
+
+			return _IdentifierString;
+		}
+	}
+
+	private string? _SequenceString = null;
+	public string Sequence
+	{
+		get
+		{
+			if (_SequenceString == null) _SequenceString = Encoding.ASCII.GetString(_Sequence.Span);
+			
+			return _SequenceString;
+		}
+	}
+
+	private string? _OtherString = null;
+	public string Other
+	{
+		get
+		{
+			if (_OtherString == null) _OtherString = Encoding.ASCII.GetString(_Other.Span);
+			
+			return _OtherString;
+		}
+	}
+
+	private string? _QualityString = null;
+	public string Quality
+	{
+		get
+		{
+			if (_QualityString == null) _QualityString = Encoding.ASCII.GetString(_Quality.Span);
+			
+			return _QualityString;
+		}
+	}
 
 	public void Dispose()
 	{

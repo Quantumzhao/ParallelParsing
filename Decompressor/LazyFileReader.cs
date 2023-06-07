@@ -1,13 +1,8 @@
 
-using System.Threading.Tasks;
-using System.Collections.Generic;
-using System.Collections;
 using ParallelParsing.ZRan.NET;
 using Index = ParallelParsing.ZRan.NET.Index;
 using System.Collections.Concurrent;
 using System.Buffers;
-using System.Diagnostics;
-using PrioritySchedulingTools;
 
 namespace ParallelParsing;
 
@@ -15,23 +10,18 @@ public sealed class LazyFileReader : IDisposable
 {
 	public const int FILE_THREADS_COUNT_SSD = 8;
 	public const int FILE_THREADS_COUNT_HDD = 1;
+	public const int MAX_QUEUE_COUNT = 32;
 	
 	public readonly ConcurrentQueue<(Point from, Point to, Memory<byte> segment, IMemoryOwner<byte>)> PartitionQueue;
 	private Index _Index;
-	// private IEnumerator<Point> _IndexEnumerator;
 	private FileStream[] _FileReads;
 	private bool _IsEOF = false;
 	private int _CurrPoint = 0;
-	// private bool _CanGetNewPartition = true;
-	// byte[] buf;
 
 	public LazyFileReader(Index index, string path, bool enableSsdOptimization)
 	{
 		_Index = index;
-		PartitionQueue = new();
-		// _IndexEnumerator = _Index.List.GetEnumerator();
-		// buf = File.ReadAllBytes(path);
-		
+		PartitionQueue = new();		
 
 		_FileReads = enableSsdOptimization ?
 					   new FileStream[FILE_THREADS_COUNT_SSD] :
@@ -39,7 +29,6 @@ public sealed class LazyFileReader : IDisposable
 		for (int i = 0; i < _FileReads.Length; i++)
 		{
 			_FileReads[i] = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-			// _FileReads[i] = new MemoryStream(buf);
 		}
 	}
 
@@ -93,7 +82,7 @@ public sealed class LazyFileReader : IDisposable
 		}
 
 		Task? readBytes = null;
-		if (!_IsEOF && PartitionQueue.Count <= 32) readBytes = Task.Run(TryReadMore);
+		if (!_IsEOF && PartitionQueue.Count <= MAX_QUEUE_COUNT) readBytes = Task.Run(TryReadMore);
 
 		if (PartitionQueue.TryDequeue(out entry))
 		{
@@ -101,15 +90,8 @@ public sealed class LazyFileReader : IDisposable
 		}
 		else
 		{
-			// var sw = new Stopwatch();
-			// sw.Start();
-			// Console.WriteLine("here");
 			readBytes?.Wait();
-			// sw.Stop();
-			// Console.WriteLine(sw.ElapsedMilliseconds);
-			// if (_IsEOF && PartitionQueue.Count == 0) Console.WriteLine("here");
 			return PartitionQueue.TryDequeue(out entry);
-			// int prevCount = PartitionQueue.Count;
 		}
 	}
 }
